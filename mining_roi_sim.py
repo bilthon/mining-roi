@@ -316,7 +316,8 @@ def main():
     ax1.set_xlabel("Block height")
     ax1.set_title("Log Scale")
     ax1.legend()
-    ax1.grid(True, which="both", axis="y")
+    light_grid = dict(which="both", color="#d0d0d0", linewidth=0.4, alpha=0.4)
+    ax1.grid(True, **light_grid)
 
     # Secondary x-axis for dates (log scale)
     ax1_top = ax1.secondary_xaxis("top", functions=(height_to_date_num, date_num_to_height))
@@ -324,6 +325,7 @@ def main():
     ax1_top.set_xlabel("Date")
     ax1_top.xaxis.set_major_locator(mdates.YearLocator())
     ax1_top.xaxis.set_minor_locator(mdates.MonthLocator((1, 7)))
+    ax1_top.tick_params(labelsize=8)
 
     # Linear scale subplot
     ax2.plot(df_700k["height"], df_700k["difficulty"], label="Real difficulty (≥700k)")
@@ -334,7 +336,7 @@ def main():
     ax2.set_xlabel("Block height")
     ax2.set_title("Linear Scale")
     ax2.legend()
-    ax2.grid(True, which="both", axis="y")
+    ax2.grid(True, **light_grid)
 
     # Secondary x-axis for dates (linear scale)
     ax2_top = ax2.secondary_xaxis("top", functions=(height_to_date_num, date_num_to_height))
@@ -342,6 +344,7 @@ def main():
     ax2_top.set_xlabel("Date")
     ax2_top.xaxis.set_major_locator(mdates.YearLocator())
     ax2_top.xaxis.set_minor_locator(mdates.MonthLocator((1, 7)))
+    ax2_top.tick_params(labelsize=8)
 
     fig.suptitle("Bitcoin Difficulty: Real Data Since 700k vs Projections", fontsize=14)
 
