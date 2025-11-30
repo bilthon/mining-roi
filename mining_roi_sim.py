@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
+import matplotlib.dates as mdates
 from sklearn.linear_model import LinearRegression
 from datetime import datetime, timezone
 
@@ -268,6 +269,41 @@ def main():
         else:
             return f"{value:.0f}"
 
+    # Conversion functions for block height <-> matplotlib date number
+    # Block time is 600 seconds (10 minutes)
+    def height_to_date_num(height):
+        timestamp = t0 + (height - h0) * 600
+        # Handle both scalars and arrays
+        if np.isscalar(timestamp):
+            dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+            return mdates.date2num(dt)
+        else:
+            # Vectorized conversion for arrays
+            dates = [datetime.fromtimestamp(ts, tz=timezone.utc) for ts in timestamp]
+            return mdates.date2num(dates)
+
+    def date_num_to_height(date_num):
+        def _ensure_datetime(dt_obj):
+            # matplotlib can hand us nested containers; peel until datetime
+            while isinstance(dt_obj, (list, tuple, np.ndarray)):
+                if len(dt_obj) == 0:
+                    raise ValueError("Received empty datetime container")
+                dt_obj = dt_obj[0]
+            if dt_obj.tzinfo is None:
+                dt_obj = dt_obj.replace(tzinfo=timezone.utc)
+            return dt_obj
+
+        date_arr = np.asarray(date_num)
+        was_scalar = date_arr.ndim == 0
+
+        dts = np.asarray(mdates.num2date(date_arr), dtype=object)
+        timestamps = np.vectorize(lambda dt: _ensure_datetime(dt).timestamp())(dts)
+        heights = h0 + (timestamps - t0) / 600
+
+        if was_scalar:
+            return heights.item()
+        return heights
+
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6), sharex=True)
 
     # Log scale subplot
@@ -282,6 +318,13 @@ def main():
     ax1.legend()
     ax1.grid(True, which="both", axis="y")
 
+    # Secondary x-axis for dates (log scale)
+    ax1_top = ax1.secondary_xaxis("top", functions=(height_to_date_num, date_num_to_height))
+    ax1_top.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+    ax1_top.set_xlabel("Date")
+    ax1_top.xaxis.set_major_locator(mdates.YearLocator())
+    ax1_top.xaxis.set_minor_locator(mdates.MonthLocator((1, 7)))
+
     # Linear scale subplot
     ax2.plot(df_700k["height"], df_700k["difficulty"], label="Real difficulty (≥700k)")
     ax2.plot(h_future, D_future_orig, "--", label="Projection: original slope")
@@ -292,6 +335,13 @@ def main():
     ax2.set_title("Linear Scale")
     ax2.legend()
     ax2.grid(True, which="both", axis="y")
+
+    # Secondary x-axis for dates (linear scale)
+    ax2_top = ax2.secondary_xaxis("top", functions=(height_to_date_num, date_num_to_height))
+    ax2_top.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+    ax2_top.set_xlabel("Date")
+    ax2_top.xaxis.set_major_locator(mdates.YearLocator())
+    ax2_top.xaxis.set_minor_locator(mdates.MonthLocator((1, 7)))
 
     fig.suptitle("Bitcoin Difficulty: Real Data Since 700k vs Projections", fontsize=14)
 
