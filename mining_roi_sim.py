@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import sys
+import argparse
 import json
 import numpy as np
 import pandas as pd
@@ -208,11 +209,13 @@ def simulate_miner(
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python mining_roi_sim.py rigs/rig_config.json")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Bitcoin mining ROI simulator")
+    parser.add_argument("rig_config", help="Path to rig config JSON")
+    parser.add_argument("--diff", action="store_true", help="Include difficulty projection plot")
+    parser.add_argument("--price", action="store_true", help="Include BTC price projection plot")
+    args = parser.parse_args()
 
-    rig_config_path = sys.argv[1]
+    rig_config_path = args.rig_config
     rig = load_rig_config(rig_config_path)
 
     name = rig.get("name", "Unnamed rig")
@@ -232,124 +235,125 @@ def main():
     diff_info = fit_difficulty_exp(df, DIFF_MIN_HEIGHT)
     print("Fitted difficulty slope b:", diff_info["b"])
 
-    # Difficulty projections plot
-    df_700k = diff_info["df_fit"]
-    t0 = diff_info["t0"]
-    h0 = diff_info["h0"]
-    D0 = diff_info["D0"]
-    b_orig = diff_info["b"]
+    if args.diff:
+        # Difficulty projections plot
+        df_700k = diff_info["df_fit"]
+        t0 = diff_info["t0"]
+        h0 = diff_info["h0"]
+        D0 = diff_info["D0"]
+        b_orig = diff_info["b"]
 
-    def D_orig(t):
-        return D0 * np.exp(b_orig * (t - t0))
+        def D_orig(t):
+            return D0 * np.exp(b_orig * (t - t0))
 
-    def D_reduced(t):
-        return D0 * np.exp(b_orig * REDUCED_SLOPE_FACTOR * (t - t0))
+        def D_reduced(t):
+            return D0 * np.exp(b_orig * REDUCED_SLOPE_FACTOR * (t - t0))
 
-    blocks_per_epoch = 2016
-    epoch_seconds = blocks_per_epoch * 600
-    seconds_per_year = 365 * 24 * 3600
-    total_seconds = YEARS_HORIZON * seconds_per_year
-    n_epochs = int(total_seconds // epoch_seconds) + 1
+        blocks_per_epoch = 2016
+        epoch_seconds = blocks_per_epoch * 600
+        seconds_per_year = 365 * 24 * 3600
+        total_seconds = YEARS_HORIZON * seconds_per_year
+        n_epochs = int(total_seconds // epoch_seconds) + 1
 
-    epoch_idx = np.arange(n_epochs)
-    t_future = t0 + epoch_idx * epoch_seconds
-    h_future = h0 + epoch_idx * blocks_per_epoch
+        epoch_idx = np.arange(n_epochs)
+        t_future = t0 + epoch_idx * epoch_seconds
+        h_future = h0 + epoch_idx * blocks_per_epoch
 
-    D_future_orig = D_orig(t_future)
-    D_future_red = D_reduced(t_future)
+        D_future_orig = D_orig(t_future)
+        D_future_red = D_reduced(t_future)
 
-    # Formatter function for metric prefixes
-    def difficulty_formatter(value, pos):
-        if value >= 1e18:
-            return f"{value / 1e18:.2f}H"
-        elif value >= 1e15:
-            return f"{value / 1e15:.2f}P"
-        elif value >= 1e12:
-            return f"{value / 1e12:.2f}T"
-        else:
-            return f"{value:.0f}"
+        # Formatter function for metric prefixes
+        def difficulty_formatter(value, pos):
+            if value >= 1e18:
+                return f"{value / 1e18:.2f}H"
+            elif value >= 1e15:
+                return f"{value / 1e15:.2f}P"
+            elif value >= 1e12:
+                return f"{value / 1e12:.2f}T"
+            else:
+                return f"{value:.0f}"
 
-    # Conversion functions for block height <-> matplotlib date number
-    # Block time is 600 seconds (10 minutes)
-    def height_to_date_num(height):
-        timestamp = t0 + (height - h0) * 600
-        # Handle both scalars and arrays
-        if np.isscalar(timestamp):
-            dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-            return mdates.date2num(dt)
-        else:
-            # Vectorized conversion for arrays
-            dates = [datetime.fromtimestamp(ts, tz=timezone.utc) for ts in timestamp]
-            return mdates.date2num(dates)
+        # Conversion functions for block height <-> matplotlib date number
+        # Block time is 600 seconds (10 minutes)
+        def height_to_date_num(height):
+            timestamp = t0 + (height - h0) * 600
+            # Handle both scalars and arrays
+            if np.isscalar(timestamp):
+                dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+                return mdates.date2num(dt)
+            else:
+                # Vectorized conversion for arrays
+                dates = [datetime.fromtimestamp(ts, tz=timezone.utc) for ts in timestamp]
+                return mdates.date2num(dates)
 
-    def date_num_to_height(date_num):
-        def _ensure_datetime(dt_obj):
-            # matplotlib can hand us nested containers; peel until datetime
-            while isinstance(dt_obj, (list, tuple, np.ndarray)):
-                if len(dt_obj) == 0:
-                    raise ValueError("Received empty datetime container")
-                dt_obj = dt_obj[0]
-            if dt_obj.tzinfo is None:
-                dt_obj = dt_obj.replace(tzinfo=timezone.utc)
-            return dt_obj
+        def date_num_to_height(date_num):
+            def _ensure_datetime(dt_obj):
+                # matplotlib can hand us nested containers; peel until datetime
+                while isinstance(dt_obj, (list, tuple, np.ndarray)):
+                    if len(dt_obj) == 0:
+                        raise ValueError("Received empty datetime container")
+                    dt_obj = dt_obj[0]
+                if dt_obj.tzinfo is None:
+                    dt_obj = dt_obj.replace(tzinfo=timezone.utc)
+                return dt_obj
 
-        date_arr = np.asarray(date_num)
-        was_scalar = date_arr.ndim == 0
+            date_arr = np.asarray(date_num)
+            was_scalar = date_arr.ndim == 0
 
-        dts = np.asarray(mdates.num2date(date_arr), dtype=object)
-        timestamps = np.vectorize(lambda dt: _ensure_datetime(dt).timestamp())(dts)
-        heights = h0 + (timestamps - t0) / 600
+            dts = np.asarray(mdates.num2date(date_arr), dtype=object)
+            timestamps = np.vectorize(lambda dt: _ensure_datetime(dt).timestamp())(dts)
+            heights = h0 + (timestamps - t0) / 600
 
-        if was_scalar:
-            return heights.item()
-        return heights
+            if was_scalar:
+                return heights.item()
+            return heights
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6), sharex=True)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6), sharex=True)
+        
+        # Log scale subplot
+        ax1.plot(df_700k["height"], df_700k["difficulty"], label="Real difficulty (≥700k)")
+        ax1.plot(h_future, D_future_orig, "--", label="Projection: original slope")
+        ax1.plot(h_future, D_future_red, ":", label=f"Projection: reduced slope ({REDUCED_SLOPE_FACTOR:.2f}×)")
+        ax1.set_yscale("log")
+        ax1.yaxis.set_major_formatter(FuncFormatter(difficulty_formatter))
+        ax1.set_ylabel("Difficulty (log scale)")
+        ax1.set_xlabel("Block height")
+        ax1.set_title("Log Scale")
+        ax1.legend()
+        light_grid = dict(which="both", color="#d0d0d0", linewidth=0.4, alpha=0.4)
+        ax1.grid(True, **light_grid)
+        
+        # Secondary x-axis for dates (log scale)
+        ax1_top = ax1.secondary_xaxis("top", functions=(height_to_date_num, date_num_to_height))
+        ax1_top.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+        ax1_top.set_xlabel("Date")
+        ax1_top.xaxis.set_major_locator(mdates.YearLocator())
+        ax1_top.xaxis.set_minor_locator(mdates.MonthLocator((1, 7)))
+        ax1_top.tick_params(labelsize=8)
+        
+        # Linear scale subplot
+        ax2.plot(df_700k["height"], df_700k["difficulty"], label="Real difficulty (≥700k)")
+        ax2.plot(h_future, D_future_orig, "--", label="Projection: original slope")
+        ax2.plot(h_future, D_future_red, ":", label=f"Projection: reduced slope ({REDUCED_SLOPE_FACTOR:.2f}×)")
+        ax2.yaxis.set_major_formatter(FuncFormatter(difficulty_formatter))
+        ax2.set_ylabel("Difficulty (linear scale)")
+        ax2.set_xlabel("Block height")
+        ax2.set_title("Linear Scale")
+        ax2.legend()
+        ax2.grid(True, **light_grid)
+        
+        # Secondary x-axis for dates (linear scale)
+        ax2_top = ax2.secondary_xaxis("top", functions=(height_to_date_num, date_num_to_height))
+        ax2_top.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+        ax2_top.set_xlabel("Date")
+        ax2_top.xaxis.set_major_locator(mdates.YearLocator())
+        ax2_top.xaxis.set_minor_locator(mdates.MonthLocator((1, 7)))
+        ax2_top.tick_params(labelsize=8)
 
-    # Log scale subplot
-    ax1.plot(df_700k["height"], df_700k["difficulty"], label="Real difficulty (≥700k)")
-    ax1.plot(h_future, D_future_orig, "--", label="Projection: original slope")
-    ax1.plot(h_future, D_future_red, ":", label=f"Projection: reduced slope ({REDUCED_SLOPE_FACTOR:.2f}×)")
-    ax1.set_yscale("log")
-    ax1.yaxis.set_major_formatter(FuncFormatter(difficulty_formatter))
-    ax1.set_ylabel("Difficulty (log scale)")
-    ax1.set_xlabel("Block height")
-    ax1.set_title("Log Scale")
-    ax1.legend()
-    light_grid = dict(which="both", color="#d0d0d0", linewidth=0.4, alpha=0.4)
-    ax1.grid(True, **light_grid)
+        fig.suptitle("Bitcoin Difficulty: Real Data Since 700k vs Projections", fontsize=14)
 
-    # Secondary x-axis for dates (log scale)
-    ax1_top = ax1.secondary_xaxis("top", functions=(height_to_date_num, date_num_to_height))
-    ax1_top.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-    ax1_top.set_xlabel("Date")
-    ax1_top.xaxis.set_major_locator(mdates.YearLocator())
-    ax1_top.xaxis.set_minor_locator(mdates.MonthLocator((1, 7)))
-    ax1_top.tick_params(labelsize=8)
-
-    # Linear scale subplot
-    ax2.plot(df_700k["height"], df_700k["difficulty"], label="Real difficulty (≥700k)")
-    ax2.plot(h_future, D_future_orig, "--", label="Projection: original slope")
-    ax2.plot(h_future, D_future_red, ":", label=f"Projection: reduced slope ({REDUCED_SLOPE_FACTOR:.2f}×)")
-    ax2.yaxis.set_major_formatter(FuncFormatter(difficulty_formatter))
-    ax2.set_ylabel("Difficulty (linear scale)")
-    ax2.set_xlabel("Block height")
-    ax2.set_title("Linear Scale")
-    ax2.legend()
-    ax2.grid(True, **light_grid)
-
-    # Secondary x-axis for dates (linear scale)
-    ax2_top = ax2.secondary_xaxis("top", functions=(height_to_date_num, date_num_to_height))
-    ax2_top.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-    ax2_top.set_xlabel("Date")
-    ax2_top.xaxis.set_major_locator(mdates.YearLocator())
-    ax2_top.xaxis.set_minor_locator(mdates.MonthLocator((1, 7)))
-    ax2_top.tick_params(labelsize=8)
-
-    fig.suptitle("Bitcoin Difficulty: Real Data Since 700k vs Projections", fontsize=14)
-
-    plt.tight_layout()
-    plt.show()
+        plt.tight_layout()
+        plt.show()
 
     # Mining sim – original slope
     df_orig, equip_sats, roi_sats_orig, roi_usd_orig = simulate_miner(
@@ -424,15 +428,16 @@ def main():
     plt.tight_layout()
     plt.show()
 
-    # --- Price curve plot (matches ROI horizon) ---
-    plt.figure(figsize=(12, 6))
-    plt.plot(df_orig["date"], df_orig["btc_price"])
-    plt.xlabel("Date")
-    plt.ylabel("BTC price (USD)")
-    plt.title(f"Projected BTC Price – Same Horizon as ROI Sim ({name})")
-    plt.grid(True, which="both", axis="y")
-    plt.tight_layout()
-    plt.show()
+    if args.price:
+        # --- Price curve plot (matches ROI horizon) ---
+        plt.figure(figsize=(12, 6))
+        plt.plot(df_orig["date"], df_orig["btc_price"])
+        plt.xlabel("Date")
+        plt.ylabel("BTC price (USD)")
+        plt.title(f"Projected BTC Price – Same Horizon as ROI Sim ({name})")
+        plt.grid(True, which="both", axis="y")
+        plt.tight_layout()
+        plt.show()
 
 if __name__ == "__main__":
     main()
