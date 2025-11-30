@@ -273,16 +273,6 @@ def main():
     print("Final cumulative sats (orig slope):", df_orig["cumulative_sats"].iloc[-1])
     print("ROI epoch index (orig slope):", roi_orig)
 
-    plt.figure(figsize=(12, 6))
-    plt.plot(df_orig["date"], df_orig["cumulative_sats"], label="Cumulative sats (orig slope)")
-    plt.axhline(0, linestyle="--", label="Break-even")
-    plt.xlabel("Date")
-    plt.ylabel("Cumulative profit (sats)")
-    plt.title(f"{name} – Cumulative Mining Profit (Original Difficulty Slope)")
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
-
     # Mining sim – reduced slope
     df_red, _, roi_red = simulate_miner(
         df,
@@ -299,12 +289,24 @@ def main():
     print("\nFinal cumulative sats (reduced slope):", df_red["cumulative_sats"].iloc[-1])
     print("ROI epoch index (reduced slope):", roi_red)
 
+    # --- Combined ROI chart: original vs reduced difficulty slope ---
     plt.figure(figsize=(12, 6))
-    plt.plot(df_red["date"], df_red["cumulative_sats"], label="Cumulative sats (reduced slope)")
-    plt.axhline(0, linestyle="--", label="Break-even")
+    plt.plot(
+        df_orig["date"],
+        df_orig["cumulative_sats"],
+        label="Cumulative sats – original slope",
+    )
+    plt.plot(
+        df_red["date"],
+        df_red["cumulative_sats"],
+        linestyle="--",
+        label=f"Cumulative sats – reduced slope ({REDUCED_SLOPE_FACTOR:.2f}×)",
+    )
+    plt.axhline(0, linestyle=":", label="Break-even (0 sats)")
+
     plt.xlabel("Date")
     plt.ylabel("Cumulative profit (sats)")
-    plt.title(f"{name} – Cumulative Mining Profit (Reduced Difficulty Slope)")
+    plt.title(f"{name} – Cumulative Mining Profit (Two Difficulty Scenarios)")
     plt.legend()
     plt.tight_layout()
     plt.show()
