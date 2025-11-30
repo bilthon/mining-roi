@@ -126,6 +126,7 @@ def simulate_miner(
 
     sats_per_usd_now = SATS_PER_BTC / btc_price_now_usd
     equipment_cost_sats = equipment_price_usd * sats_per_usd_now
+    equipment_cost_usd = equipment_price_usd  # trivial, but explicit
 
     difficulty = np.zeros(n_epochs)
     Hnet = np.zeros(n_epochs)
@@ -164,15 +165,25 @@ def simulate_miner(
         net_usd_epoch[i] = net_usd
 
         if net_usd <= 0:
+            # Shutdown rule: miner OFF for this epoch.
+            # No profit/loss in USD, no sat movement.
+            net_usd_epoch[i] = 0.0
             net_sats_epoch[i] = 0.0
         else:
+            # Miner ON: count both USD and sats economics
             sats_per_usd_here = SATS_PER_BTC / btc_price[i]
             elec_epoch_sats = elec_cost_epoch_usd * sats_per_usd_here
             net_sats_epoch[i] = sats_reward_epoch[i] - elec_epoch_sats
 
+    # ROI in sats
     cumulative_sats = -equipment_cost_sats + np.cumsum(net_sats_epoch)
     roi_indices = np.where(cumulative_sats >= 0)[0]
-    roi_index = int(roi_indices[0]) if len(roi_indices) > 0 else None
+    roi_sats_index = int(roi_indices[0]) if len(roi_indices) > 0 else None
+
+    # ROI in USD (for fiat-minded)
+    cumulative_usd = -equipment_cost_usd + np.cumsum(net_usd_epoch)
+    roi_usd_idx = np.where(cumulative_usd >= 0)[0]
+    roi_usd_idx = int(roi_usd_idx[0]) if len(roi_usd_idx) > 0 else None
 
     df_out = pd.DataFrame(
         {
@@ -187,10 +198,11 @@ def simulate_miner(
             "net_usd_epoch": net_usd_epoch,
             "net_sats_epoch": net_sats_epoch,
             "cumulative_sats": cumulative_sats,
+            "cumulative_usd": cumulative_usd,
         }
     )
 
-    return df_out, equipment_cost_sats, roi_index
+    return df_out, equipment_cost_sats, roi_sats_index, roi_usd_idx
 
 
 def main():
@@ -257,7 +269,7 @@ def main():
     plt.show()
 
     # Mining sim – original slope
-    df_orig, equip_sats, roi_orig = simulate_miner(
+    df_orig, equip_sats, roi_sats_orig, roi_usd_orig = simulate_miner(
         df,
         diff_info,
         slope_factor=1.0,
@@ -271,10 +283,12 @@ def main():
 
     print("\nEquipment cost (sats):", equip_sats)
     print("Final cumulative sats (orig slope):", df_orig["cumulative_sats"].iloc[-1])
-    print("ROI epoch index (orig slope):", roi_orig)
+    print("ROI epoch index in sats (orig slope):", roi_sats_orig)
+    print("Final cumulative USD (orig slope):", df_orig["cumulative_usd"].iloc[-1])
+    print("ROI epoch index in USD (orig slope):", roi_usd_orig)
 
     # Mining sim – reduced slope
-    df_red, _, roi_red = simulate_miner(
+    df_red, _, roi_sats_red, roi_usd_red = simulate_miner(
         df,
         diff_info,
         slope_factor=REDUCED_SLOPE_FACTOR,
@@ -287,7 +301,9 @@ def main():
     )
 
     print("\nFinal cumulative sats (reduced slope):", df_red["cumulative_sats"].iloc[-1])
-    print("ROI epoch index (reduced slope):", roi_red)
+    print("ROI epoch index in sats (reduced slope):", roi_sats_red)
+    print("Final cumulative USD (reduced slope):", df_red["cumulative_usd"].iloc[-1])
+    print("ROI epoch index in USD (reduced slope):", roi_usd_red)
 
     # --- Combined ROI chart: original vs reduced difficulty slope ---
     plt.figure(figsize=(12, 6))
@@ -307,6 +323,20 @@ def main():
     plt.xlabel("Date")
     plt.ylabel("Cumulative profit (sats)")
     plt.title(f"{name} – Cumulative Mining Profit (Two Difficulty Scenarios)")
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    # --- Combined ROI chart: original vs reduced difficulty slope (USD) ---
+    plt.figure(figsize=(12, 6))
+    plt.plot(df_orig["date"], df_orig["cumulative_usd"], label="Cumulative USD – original slope")
+    plt.plot(df_red["date"], df_red["cumulative_usd"], linestyle="--",
+            label=f"Cumulative USD – reduced slope ({REDUCED_SLOPE_FACTOR:.2f}×)")
+    plt.axhline(0, linestyle=":", label="Break-even (0 USD)")
+
+    plt.xlabel("Date")
+    plt.ylabel("Cumulative profit (USD)")
+    plt.title(f"{name} – Cumulative Mining Profit (Two Difficulty Scenarios, USD)")
     plt.legend()
     plt.tight_layout()
     plt.show()
