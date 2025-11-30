@@ -4,6 +4,7 @@ import json
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 from sklearn.linear_model import LinearRegression
 from datetime import datetime, timezone
 
@@ -256,15 +257,44 @@ def main():
     D_future_orig = D_orig(t_future)
     D_future_red = D_reduced(t_future)
 
-    plt.figure(figsize=(12, 6))
-    plt.plot(df_700k["height"], df_700k["difficulty"], label="Real difficulty (≥700k)")
-    plt.plot(h_future, D_future_orig, "--", label="Projection: original slope")
-    plt.plot(h_future, D_future_red, ":", label=f"Projection: reduced slope ({REDUCED_SLOPE_FACTOR:.2f}×)")
-    plt.yscale("log")
-    plt.xlabel("Block height")
-    plt.ylabel("Difficulty (log scale)")
-    plt.title("Bitcoin Difficulty: Real Data Since 700k vs Projections")
-    plt.legend()
+    # Formatter function for metric prefixes
+    def difficulty_formatter(value, pos):
+        if value >= 1e18:
+            return f"{value / 1e18:.2f}H"
+        elif value >= 1e15:
+            return f"{value / 1e15:.2f}P"
+        elif value >= 1e12:
+            return f"{value / 1e12:.2f}T"
+        else:
+            return f"{value:.0f}"
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6), sharex=True)
+
+    # Log scale subplot
+    ax1.plot(df_700k["height"], df_700k["difficulty"], label="Real difficulty (≥700k)")
+    ax1.plot(h_future, D_future_orig, "--", label="Projection: original slope")
+    ax1.plot(h_future, D_future_red, ":", label=f"Projection: reduced slope ({REDUCED_SLOPE_FACTOR:.2f}×)")
+    ax1.set_yscale("log")
+    ax1.yaxis.set_major_formatter(FuncFormatter(difficulty_formatter))
+    ax1.set_ylabel("Difficulty (log scale)")
+    ax1.set_xlabel("Block height")
+    ax1.set_title("Log Scale")
+    ax1.legend()
+    ax1.grid(True, which="both", axis="y")
+
+    # Linear scale subplot
+    ax2.plot(df_700k["height"], df_700k["difficulty"], label="Real difficulty (≥700k)")
+    ax2.plot(h_future, D_future_orig, "--", label="Projection: original slope")
+    ax2.plot(h_future, D_future_red, ":", label=f"Projection: reduced slope ({REDUCED_SLOPE_FACTOR:.2f}×)")
+    ax2.yaxis.set_major_formatter(FuncFormatter(difficulty_formatter))
+    ax2.set_ylabel("Difficulty (linear scale)")
+    ax2.set_xlabel("Block height")
+    ax2.set_title("Linear Scale")
+    ax2.legend()
+    ax2.grid(True, which="both", axis="y")
+
+    fig.suptitle("Bitcoin Difficulty: Real Data Since 700k vs Projections", fontsize=14)
+
     plt.tight_layout()
     plt.show()
 
