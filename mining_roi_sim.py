@@ -309,6 +309,15 @@ def main():
     plt.tight_layout()
     plt.show()
 
+    # --- Price curve plot (matches ROI horizon) ---
+    plt.figure(figsize=(12, 6))
+    plt.plot(df_orig["date"], df_orig["btc_price"])
+    plt.xlabel("Date")
+    plt.ylabel("BTC price (USD)")
+    plt.title(f"Projected BTC Price – Same Horizon as ROI Sim ({name})")
+    plt.grid(True, which="both", axis="y")
+    plt.tight_layout()
+    plt.show()
 
 if __name__ == "__main__":
     main()
