@@ -127,6 +127,7 @@ def plot_difficulty_projections(diff_info: dict) -> None:
 
 
 def plot_single_rig_roi(name: str, df_orig, df_red) -> None:
+    light_grid = dict(which="both", color="#d0d0d0", linewidth=0.4, alpha=0.4)
     plt.figure(figsize=(12, 6))
     plt.plot(df_orig["date"], df_orig["cumulative_sats"], label="Cumulative sats – original slope")
     plt.plot(
@@ -140,6 +141,7 @@ def plot_single_rig_roi(name: str, df_orig, df_red) -> None:
     plt.ylabel("Cumulative profit (millions of sats)")
     plt.title(f"{name} – Cumulative Mining Profit (Two Difficulty Scenarios)")
     plt.legend()
+    plt.grid(True, **light_grid)
     plt.tight_layout()
     plt.show()
 
@@ -156,11 +158,13 @@ def plot_single_rig_roi(name: str, df_orig, df_red) -> None:
     plt.ylabel("Cumulative profit (USD)")
     plt.title(f"{name} – Cumulative Mining Profit (Two Difficulty Scenarios, USD)")
     plt.legend()
+    plt.grid(True, **light_grid)
     plt.tight_layout()
     plt.show()
 
 
 def plot_multi_rig_comparison(rig_results: Iterable[dict], value_key: str, ylabel: str, title: str) -> None:
+    light_grid = dict(which="both", color="#d0d0d0", linewidth=0.4, alpha=0.4)
     plt.figure(figsize=(12, 6))
     for entry in rig_results:
         df = entry["df"]
@@ -170,6 +174,7 @@ def plot_multi_rig_comparison(rig_results: Iterable[dict], value_key: str, ylabe
     plt.ylabel(ylabel)
     plt.title(title)
     plt.legend()
+    plt.grid(True, **light_grid)
     plt.tight_layout()
     plt.show()
 
