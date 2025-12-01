@@ -1,363 +1,58 @@
 #!/usr/bin/env python3
-import sys
 import argparse
-import json
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.ticker import FuncFormatter
-import matplotlib.dates as mdates
-from sklearn.linear_model import LinearRegression
-from datetime import datetime, timezone
+from pathlib import Path
 
-# ------------ GLOBAL CONFIG (non-rig stuff) -----------------
-
-CSV_PATH = "difficulty_epochs.csv"
-
-ELECTRICITY_USD_PER_KWH = 0.05
-BTC_PRICE_NOW_USD = 90_000.0
-
-FEE_SATS_PER_BLOCK = 1_000_000
-YEARS_HORIZON = 4
-DIFF_MIN_HEIGHT = 700_000
-
-# Reduced slope factor for the "slower difficulty" scenario
-REDUCED_SLOPE_FACTOR = 0.75
-
-# Porkopolis-like power law params (price vs days since genesis)
-PL_A = 1.44e-17
-PL_B = 5.78
-GENESIS = datetime(2009, 1, 3, tzinfo=timezone.utc)
-
-SATS_PER_BTC = 100_000_000
-
-# ------------------------------------------------------------
+from config import (
+    BTC_PRICE_NOW_USD,
+    CSV_PATH,
+    DIFF_MIN_HEIGHT,
+    ELECTRICITY_USD_PER_KWH,
+    REDUCED_SLOPE_FACTOR,
+    RIGS_DIR,
+    YEARS_HORIZON,
+)
+from data_loader import load_all_rigs, load_difficulty_data, load_rig_config
+from difficulty_model import fit_difficulty_exp
+from mining_simulator import simulate_miner
+from plotting import (
+    plot_difficulty_projections,
+    plot_multi_rig_comparison,
+    plot_price_projection,
+    plot_single_rig_roi,
+)
 
 
-def load_rig_config(path: str) -> dict:
-    with open(path, "r") as f:
-        return json.load(f)
-
-
-def fit_difficulty_exp(df: pd.DataFrame, min_height: int):
-    df2 = df[df["height"] >= min_height].copy()
-    df2["t"] = df2["timestamp"].astype(float)
-    df2["logD"] = np.log(df2["difficulty"])
-
-    X = df2[["t"]]
-    y = df2["logD"]
-    model = LinearRegression().fit(X, y)
-
-    a = model.intercept_
-    b = model.coef_[0]
-
-    last = df2.iloc[-1]
-    t0 = float(last["timestamp"])
-    h0 = int(last["height"])
-    D0 = float(last["difficulty"])
-
-    return {
-        "a": a,
-        "b": b,
-        "t0": t0,
-        "h0": h0,
-        "D0": D0,
-        "df_fit": df2,
-    }
-
-
-def make_difficulty_func(D0, t0, b_scaled):
-    def D(t):
-        return D0 * np.exp(b_scaled * (t - t0))
-    return D
-
-
-def btc_price_powerlaw(dates, anchor_price_now):
-    days = np.array([(dt - GENESIS).days for dt in dates], dtype=float)
-    trend = PL_A * days**PL_B
-    days_now = days[0]
-    trend_now = PL_A * (days_now**PL_B)
-    k = anchor_price_now / trend_now
-    return k * trend
-
-
-def simulate_miner(
-    df_diff,
-    difficulty_info,
-    slope_factor,
-    hashrate_ths,
-    efficiency_j_per_th,
-    equipment_price_usd,
-    electricity_usd_per_kwh,
-    btc_price_now_usd,
-    years_horizon,
-):
-    # Difficulty model anchored at current point
-    b_orig = difficulty_info["b"]
-    t0 = difficulty_info["t0"]
-    h0 = difficulty_info["h0"]
-    D0 = difficulty_info["D0"]
-
-    b_scaled = b_orig * slope_factor
-    D_func = make_difficulty_func(D0, t0, b_scaled)
-
-    # Epoch timing
-    blocks_per_epoch = 2016
-    blocks_per_day = 144
-    days_per_epoch = blocks_per_epoch / blocks_per_day
-    epoch_seconds = blocks_per_epoch * 600
-    seconds_per_year = 365 * 24 * 3600
-
-    total_seconds = years_horizon * seconds_per_year
-    n_epochs = int(total_seconds // epoch_seconds) + 1
-
-    epoch_idx = np.arange(n_epochs)
-    timestamps = t0 + epoch_idx * epoch_seconds
-    dates = [datetime.fromtimestamp(ts, tz=timezone.utc) for ts in timestamps]
-    heights = h0 + epoch_idx * blocks_per_epoch
-
-    # Price curve
-    btc_price = btc_price_powerlaw(dates, anchor_price_now=btc_price_now_usd)
-
-    # Miner + power
-    hashrate_hs = hashrate_ths * 1e12
-    power_watts = hashrate_ths * efficiency_j_per_th
-    power_kw = power_watts / 1000.0
-    daily_kwh = power_kw * 24.0
-    daily_elec_cost_usd = daily_kwh * electricity_usd_per_kwh
-    elec_cost_epoch_usd = daily_elec_cost_usd * days_per_epoch
-
-    sats_per_usd_now = SATS_PER_BTC / btc_price_now_usd
-    equipment_cost_sats = equipment_price_usd * sats_per_usd_now
-    equipment_cost_usd = equipment_price_usd  # trivial, but explicit
-
-    difficulty = np.zeros(n_epochs)
-    Hnet = np.zeros(n_epochs)
-    share = np.zeros(n_epochs)
-    subsidy_btc = np.zeros(n_epochs)
-    btc_reward_epoch = np.zeros(n_epochs)
-    sats_reward_epoch = np.zeros(n_epochs)
-    net_sats_epoch = np.zeros(n_epochs)
-    net_usd_epoch = np.zeros(n_epochs)
-
-    for i in range(n_epochs):
-        t = timestamps[i]
-        difficulty[i] = D_func(t)
-        Hnet[i] = difficulty[i] * (2**32) / 600.0
-        share[i] = hashrate_hs / Hnet[i]
-
-        h = heights[i]
-        if h < 840_000:
-            subsidy_btc[i] = 6.25
-        elif h < 1_050_000:
-            subsidy_btc[i] = 3.125
-        elif h < 1_260_000:
-            subsidy_btc[i] = 1.5625
-        else:
-            subsidy_btc[i] = 0.78125
-
-        subsidy_sats_block = subsidy_btc[i] * SATS_PER_BTC
-        reward_sats_block = subsidy_sats_block + FEE_SATS_PER_BLOCK
-        reward_btc_block = reward_sats_block / SATS_PER_BTC
-
-        btc_reward_epoch[i] = reward_btc_block * blocks_per_epoch * share[i]
-        sats_reward_epoch[i] = btc_reward_epoch[i] * SATS_PER_BTC
-
-        revenue_epoch_usd = btc_reward_epoch[i] * btc_price[i]
-        net_usd = revenue_epoch_usd - elec_cost_epoch_usd
-        net_usd_epoch[i] = net_usd
-
-        if net_usd <= 0:
-            # Shutdown rule: miner OFF for this epoch.
-            # No profit/loss in USD, no sat movement.
-            net_usd_epoch[i] = 0.0
-            net_sats_epoch[i] = 0.0
-        else:
-            # Miner ON: count both USD and sats economics
-            sats_per_usd_here = SATS_PER_BTC / btc_price[i]
-            elec_epoch_sats = elec_cost_epoch_usd * sats_per_usd_here
-            net_sats_epoch[i] = sats_reward_epoch[i] - elec_epoch_sats
-
-    # ROI in sats
-    cumulative_sats = -equipment_cost_sats + np.cumsum(net_sats_epoch)
-    roi_indices = np.where(cumulative_sats >= 0)[0]
-    roi_sats_index = int(roi_indices[0]) if len(roi_indices) > 0 else None
-
-    # ROI in USD (for fiat-minded)
-    cumulative_usd = -equipment_cost_usd + np.cumsum(net_usd_epoch)
-    roi_usd_idx = np.where(cumulative_usd >= 0)[0]
-    roi_usd_idx = int(roi_usd_idx[0]) if len(roi_usd_idx) > 0 else None
-
-    df_out = pd.DataFrame(
-        {
-            "epoch": epoch_idx,
-            "timestamp": timestamps,
-            "date": dates,
-            "height": heights,
-            "btc_price": btc_price,
-            "difficulty": difficulty,
-            "subsidy_btc": subsidy_btc,
-            "sats_reward_epoch": sats_reward_epoch,
-            "net_usd_epoch": net_usd_epoch,
-            "net_sats_epoch": net_sats_epoch,
-            "cumulative_sats": cumulative_sats,
-            "cumulative_usd": cumulative_usd,
-        }
-    )
-
-    return df_out, equipment_cost_sats, roi_sats_index, roi_usd_idx
-
-
-def main():
+def parse_args():
     parser = argparse.ArgumentParser(description="Bitcoin mining ROI simulator")
-    parser.add_argument("rig_config", help="Path to rig config JSON")
+    parser.add_argument("rig_config", nargs="?", help="Path to rig config JSON")
+    parser.add_argument(
+        "--rigs-dir",
+        default=None,
+        help="Directory containing rig JSON configs (used when no rig is specified)",
+    )
     parser.add_argument("--diff", action="store_true", help="Include difficulty projection plot")
     parser.add_argument("--price", action="store_true", help="Include BTC price projection plot")
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    rig_config_path = args.rig_config
-    rig = load_rig_config(rig_config_path)
+
+def print_rig_summary(name, hashrate_ths, efficiency_j_per_th, equipment_price_usd):
+    print(f"Rig: {name}")
+    print(f"  Hashrate:   {hashrate_ths} TH/s")
+    print(f"  Efficiency: {efficiency_j_per_th} J/TH")
+    print(f"  Price:      ${equipment_price_usd}")
+
+
+def run_single_rig(rig_path: Path, diff_info: dict, args):
+    rig = load_rig_config(rig_path)
 
     name = rig.get("name", "Unnamed rig")
     hashrate_ths = float(rig["hashrate_ths"])
     efficiency_j_per_th = float(rig["efficiency_j_per_th"])
     equipment_price_usd = float(rig["equipment_price_usd"])
 
-    print(f"Rig: {name}")
-    print(f"  Hashrate:   {hashrate_ths} TH/s")
-    print(f"  Efficiency: {efficiency_j_per_th} J/TH")
-    print(f"  Price:      ${equipment_price_usd}")
+    print_rig_summary(name, hashrate_ths, efficiency_j_per_th, equipment_price_usd)
 
-    # Load difficulty data
-    df = pd.read_csv(CSV_PATH)
-
-    # Fit difficulty
-    diff_info = fit_difficulty_exp(df, DIFF_MIN_HEIGHT)
-    print("Fitted difficulty slope b:", diff_info["b"])
-
-    if args.diff:
-        # Difficulty projections plot
-        df_700k = diff_info["df_fit"]
-        t0 = diff_info["t0"]
-        h0 = diff_info["h0"]
-        D0 = diff_info["D0"]
-        b_orig = diff_info["b"]
-
-        def D_orig(t):
-            return D0 * np.exp(b_orig * (t - t0))
-
-        def D_reduced(t):
-            return D0 * np.exp(b_orig * REDUCED_SLOPE_FACTOR * (t - t0))
-
-        blocks_per_epoch = 2016
-        epoch_seconds = blocks_per_epoch * 600
-        seconds_per_year = 365 * 24 * 3600
-        total_seconds = YEARS_HORIZON * seconds_per_year
-        n_epochs = int(total_seconds // epoch_seconds) + 1
-
-        epoch_idx = np.arange(n_epochs)
-        t_future = t0 + epoch_idx * epoch_seconds
-        h_future = h0 + epoch_idx * blocks_per_epoch
-
-        D_future_orig = D_orig(t_future)
-        D_future_red = D_reduced(t_future)
-
-        # Formatter function for metric prefixes
-        def difficulty_formatter(value, pos):
-            if value >= 1e18:
-                return f"{value / 1e18:.2f}H"
-            elif value >= 1e15:
-                return f"{value / 1e15:.2f}P"
-            elif value >= 1e12:
-                return f"{value / 1e12:.2f}T"
-            else:
-                return f"{value:.0f}"
-
-        # Conversion functions for block height <-> matplotlib date number
-        # Block time is 600 seconds (10 minutes)
-        def height_to_date_num(height):
-            timestamp = t0 + (height - h0) * 600
-            # Handle both scalars and arrays
-            if np.isscalar(timestamp):
-                dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-                return mdates.date2num(dt)
-            else:
-                # Vectorized conversion for arrays
-                dates = [datetime.fromtimestamp(ts, tz=timezone.utc) for ts in timestamp]
-                return mdates.date2num(dates)
-
-        def date_num_to_height(date_num):
-            def _ensure_datetime(dt_obj):
-                # matplotlib can hand us nested containers; peel until datetime
-                while isinstance(dt_obj, (list, tuple, np.ndarray)):
-                    if len(dt_obj) == 0:
-                        raise ValueError("Received empty datetime container")
-                    dt_obj = dt_obj[0]
-                if dt_obj.tzinfo is None:
-                    dt_obj = dt_obj.replace(tzinfo=timezone.utc)
-                return dt_obj
-
-            date_arr = np.asarray(date_num)
-            was_scalar = date_arr.ndim == 0
-
-            dts = np.asarray(mdates.num2date(date_arr), dtype=object)
-            timestamps = np.vectorize(lambda dt: _ensure_datetime(dt).timestamp())(dts)
-            heights = h0 + (timestamps - t0) / 600
-
-            if was_scalar:
-                return heights.item()
-            return heights
-
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6), sharex=True)
-        
-        # Log scale subplot
-        ax1.plot(df_700k["height"], df_700k["difficulty"], label="Real difficulty (≥700k)")
-        ax1.plot(h_future, D_future_orig, "--", label="Projection: original slope")
-        ax1.plot(h_future, D_future_red, ":", label=f"Projection: reduced slope ({REDUCED_SLOPE_FACTOR:.2f}×)")
-        ax1.set_yscale("log")
-        ax1.yaxis.set_major_formatter(FuncFormatter(difficulty_formatter))
-        ax1.set_ylabel("Difficulty (log scale)")
-        ax1.set_xlabel("Block height")
-        ax1.set_title("Log Scale")
-        ax1.legend()
-        light_grid = dict(which="both", color="#d0d0d0", linewidth=0.4, alpha=0.4)
-        ax1.grid(True, **light_grid)
-        
-        # Secondary x-axis for dates (log scale)
-        ax1_top = ax1.secondary_xaxis("top", functions=(height_to_date_num, date_num_to_height))
-        ax1_top.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-        ax1_top.set_xlabel("Date")
-        ax1_top.xaxis.set_major_locator(mdates.YearLocator())
-        ax1_top.xaxis.set_minor_locator(mdates.MonthLocator((1, 7)))
-        ax1_top.tick_params(labelsize=8)
-        
-        # Linear scale subplot
-        ax2.plot(df_700k["height"], df_700k["difficulty"], label="Real difficulty (≥700k)")
-        ax2.plot(h_future, D_future_orig, "--", label="Projection: original slope")
-        ax2.plot(h_future, D_future_red, ":", label=f"Projection: reduced slope ({REDUCED_SLOPE_FACTOR:.2f}×)")
-        ax2.yaxis.set_major_formatter(FuncFormatter(difficulty_formatter))
-        ax2.set_ylabel("Difficulty (linear scale)")
-        ax2.set_xlabel("Block height")
-        ax2.set_title("Linear Scale")
-        ax2.legend()
-        ax2.grid(True, **light_grid)
-        
-        # Secondary x-axis for dates (linear scale)
-        ax2_top = ax2.secondary_xaxis("top", functions=(height_to_date_num, date_num_to_height))
-        ax2_top.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-        ax2_top.set_xlabel("Date")
-        ax2_top.xaxis.set_major_locator(mdates.YearLocator())
-        ax2_top.xaxis.set_minor_locator(mdates.MonthLocator((1, 7)))
-        ax2_top.tick_params(labelsize=8)
-
-        fig.suptitle("Bitcoin Difficulty: Real Data Since 700k vs Projections", fontsize=14)
-
-        plt.tight_layout()
-        plt.show()
-
-    # Mining sim – original slope
     df_orig, equip_sats, roi_sats_orig, roi_usd_orig = simulate_miner(
-        df,
         diff_info,
         slope_factor=1.0,
         hashrate_ths=hashrate_ths,
@@ -374,9 +69,7 @@ def main():
     print("Final cumulative USD (orig slope):", df_orig["cumulative_usd"].iloc[-1])
     print("ROI epoch index in USD (orig slope):", roi_usd_orig)
 
-    # Mining sim – reduced slope
     df_red, _, roi_sats_red, roi_usd_red = simulate_miner(
-        df,
         diff_info,
         slope_factor=REDUCED_SLOPE_FACTOR,
         hashrate_ths=hashrate_ths,
@@ -392,52 +85,83 @@ def main():
     print("Final cumulative USD (reduced slope):", df_red["cumulative_usd"].iloc[-1])
     print("ROI epoch index in USD (reduced slope):", roi_usd_red)
 
-    # --- Combined ROI chart: original vs reduced difficulty slope ---
-    plt.figure(figsize=(12, 6))
-    plt.plot(
-        df_orig["date"],
-        df_orig["cumulative_sats"],
-        label="Cumulative sats – original slope",
-    )
-    plt.plot(
-        df_red["date"],
-        df_red["cumulative_sats"],
-        linestyle="--",
-        label=f"Cumulative sats – reduced slope ({REDUCED_SLOPE_FACTOR:.2f}×)",
-    )
-    plt.axhline(0, linestyle=":", label="Break-even (0 sats)")
-
-    plt.xlabel("Date")
-    plt.ylabel("Cumulative profit (sats)")
-    plt.title(f"{name} – Cumulative Mining Profit (Two Difficulty Scenarios)")
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
-
-    # --- Combined ROI chart: original vs reduced difficulty slope (USD) ---
-    plt.figure(figsize=(12, 6))
-    plt.plot(df_orig["date"], df_orig["cumulative_usd"], label="Cumulative USD – original slope")
-    plt.plot(df_red["date"], df_red["cumulative_usd"], linestyle="--",
-            label=f"Cumulative USD – reduced slope ({REDUCED_SLOPE_FACTOR:.2f}×)")
-    plt.axhline(0, linestyle=":", label="Break-even (0 USD)")
-
-    plt.xlabel("Date")
-    plt.ylabel("Cumulative profit (USD)")
-    plt.title(f"{name} – Cumulative Mining Profit (Two Difficulty Scenarios, USD)")
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
+    plot_single_rig_roi(name, df_orig, df_red)
 
     if args.price:
-        # --- Price curve plot (matches ROI horizon) ---
-        plt.figure(figsize=(12, 6))
-        plt.plot(df_orig["date"], df_orig["btc_price"])
-        plt.xlabel("Date")
-        plt.ylabel("BTC price (USD)")
-        plt.title(f"Projected BTC Price – Same Horizon as ROI Sim ({name})")
-        plt.grid(True, which="both", axis="y")
-        plt.tight_layout()
-        plt.show()
+        plot_price_projection(df_orig, name)
+
+
+def run_multi_rig(rigs_dir: Path, diff_info: dict, args):
+    rig_entries = load_all_rigs(rigs_dir)
+    if not rig_entries:
+        print(f"No rig configs found in {rigs_dir}")
+        return
+
+    rig_results = []
+    for entry in rig_entries:
+        config = entry["config"]
+        name = config.get("name", entry["path"].stem)
+        hashrate_ths = float(config["hashrate_ths"])
+        efficiency_j_per_th = float(config["efficiency_j_per_th"])
+        equipment_price_usd = float(config["equipment_price_usd"])
+
+        print_rig_summary(name, hashrate_ths, efficiency_j_per_th, equipment_price_usd)
+
+        df_orig, equip_sats, roi_sats, roi_usd = simulate_miner(
+            diff_info,
+            slope_factor=1.0,
+            hashrate_ths=hashrate_ths,
+            efficiency_j_per_th=efficiency_j_per_th,
+            equipment_price_usd=equipment_price_usd,
+            electricity_usd_per_kwh=ELECTRICITY_USD_PER_KWH,
+            btc_price_now_usd=BTC_PRICE_NOW_USD,
+            years_horizon=YEARS_HORIZON,
+        )
+
+        print("  Equipment cost (sats):", equip_sats)
+        print("  Final cumulative sats:", df_orig["cumulative_sats"].iloc[-1])
+        print("  ROI epoch index in sats:", roi_sats)
+        print("  Final cumulative USD:", df_orig["cumulative_usd"].iloc[-1])
+        print("  ROI epoch index in USD:", roi_usd)
+        print()
+
+        rig_results.append({"name": name, "df": df_orig})
+
+    plot_multi_rig_comparison(
+        rig_results,
+        value_key="cumulative_sats",
+        ylabel="Cumulative profit (millions of sats)",
+        title="All Rigs – Cumulative Sats ROI (Realistic Projection)",
+    )
+
+    plot_multi_rig_comparison(
+        rig_results,
+        value_key="cumulative_usd",
+        ylabel="Cumulative profit (USD)",
+        title="All Rigs – Cumulative USD ROI (Realistic Projection)",
+    )
+
+    if args.price and rig_results:
+        plot_price_projection(rig_results[0]["df"], "All rigs")
+
+
+def main():
+    args = parse_args()
+
+    rigs_dir = Path(args.rigs_dir).expanduser() if args.rigs_dir else RIGS_DIR
+
+    df = load_difficulty_data(CSV_PATH)
+    diff_info = fit_difficulty_exp(df, DIFF_MIN_HEIGHT)
+    print("Fitted difficulty slope b:", diff_info["b"])
+
+    if args.diff:
+        plot_difficulty_projections(diff_info)
+
+    if args.rig_config:
+        run_single_rig(Path(args.rig_config), diff_info, args)
+    else:
+        run_multi_rig(rigs_dir, diff_info, args)
+
 
 if __name__ == "__main__":
     main()
