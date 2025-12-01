@@ -74,6 +74,11 @@ Key parameters you can adjust in `config.py`:
 - `DIFF_MIN_HEIGHT`: Minimum block height for difficulty fitting (default: 700,000)
 - `REDUCED_SLOPE_FACTOR`: Factor for reduced difficulty growth scenario (default: 0.75)
 - `FEE_SATS_PER_BLOCK`: Average transaction fees per block in satoshis (default: 1,000,000)
+- `CURTAILMENT_ENABLED`: Enable curtailed uptime modeling (default: `False`)
+- `CURTAILMENT_HOURS_PER_WEEK`: Number of hours each week the miner can operate when curtailment is enabled (default: 168)
+- `CURTAILMENT_ELECTRICITY_USD_PER_KWH`: Electricity price applied during the allowed runtime window (default: same as `ELECTRICITY_USD_PER_KWH`)
+
+To represent a 120-hour cheap-power window, set `CURTAILMENT_ENABLED = True`, `CURTAILMENT_HOURS_PER_WEEK = 120`, and assign the discounted rate to `CURTAILMENT_ELECTRICITY_USD_PER_KWH`.
 
 ### Mining Rig Configuration
 
@@ -196,8 +201,9 @@ For each epoch (2016 blocks ≈ 2 weeks):
    - Block subsidy (halving-aware: 6.25 → 3.125 → 1.5625 → 0.78125 BTC)
    - Transaction fees (configurable)
 4. **Calculate costs**: Electricity consumption based on hashrate and efficiency
-5. **Calculate net profit**: Revenue - electricity costs
-6. **Track cumulative profit**: Starting from negative equipment cost
+5. **Apply curtailment (optional)**: If enabled, rewards and electricity costs are scaled by the uptime fraction (e.g., 120/168 hours per week) using the specified curtailed electricity rate.
+6. **Calculate net profit**: Revenue - electricity costs
+7. **Track cumulative profit**: Starting from negative equipment cost
 
 The simulation accounts for:
 - Difficulty increases over time
@@ -260,6 +266,7 @@ The reduced slope scenario provides a more conservative estimate, accounting for
 ### Important Considerations
 
 - **Assumptions**: The model assumes constant electricity costs, no equipment failures, and continuous mining
+- **Curtailment Windows**: With curtailment enabled, the miner only earns revenue and incurs electricity costs during the configured uptime window (e.g., 120 cheap-rate hours each week); outside that window it is fully powered down.
 - **Price Volatility**: BTC price projections are based on historical trends and may not reflect future volatility
 - **Difficulty Growth**: Actual difficulty growth may differ from projections
 - **Network Fees**: Uses a fixed average fee per block; actual fees vary

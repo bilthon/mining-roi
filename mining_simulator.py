@@ -5,7 +5,7 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 
-from config import FEE_SATS_PER_BLOCK
+from config import FEE_SATS_PER_BLOCK, HOURS_PER_WEEK
 from difficulty_model import btc_price_powerlaw, make_difficulty_func
 
 SATS_PER_BTC = 100_000_000
@@ -19,6 +19,9 @@ def simulate_miner(
     electricity_usd_per_kwh: float,
     btc_price_now_usd: float,
     years_horizon: int,
+    curtailment_enabled: bool = False,
+    curtailment_hours_per_week: float = HOURS_PER_WEEK,
+    curtailment_electricity_usd_per_kwh: Optional[float] = None,
 ) -> Tuple[pd.DataFrame, float, Optional[int], Optional[int]]:
     b_orig = difficulty_info["b"]
     t0 = difficulty_info["t0"]
@@ -44,12 +47,24 @@ def simulate_miner(
 
     btc_price = btc_price_powerlaw(dates, anchor_price_now=btc_price_now_usd)
 
+    if curtailment_electricity_usd_per_kwh is None:
+        curtailment_electricity_usd_per_kwh = electricity_usd_per_kwh
+
+    if curtailment_enabled:
+        uptime_hours = max(0.0, min(curtailment_hours_per_week, HOURS_PER_WEEK))
+        effective_rate = curtailment_electricity_usd_per_kwh
+    else:
+        uptime_hours = HOURS_PER_WEEK
+        effective_rate = electricity_usd_per_kwh
+
+    uptime_fraction = uptime_hours / HOURS_PER_WEEK
+
     hashrate_hs = hashrate_ths * 1e12
     power_watts = hashrate_ths * efficiency_j_per_th
     power_kw = power_watts / 1000.0
     daily_kwh = power_kw * 24.0
-    daily_elec_cost_usd = daily_kwh * electricity_usd_per_kwh
-    elec_cost_epoch_usd = daily_elec_cost_usd * days_per_epoch
+    daily_elec_cost_usd = daily_kwh * effective_rate
+    elec_cost_epoch_usd = daily_elec_cost_usd * days_per_epoch * uptime_fraction
 
     sats_per_usd_now = SATS_PER_BTC / btc_price_now_usd
     equipment_cost_sats = equipment_price_usd * sats_per_usd_now
@@ -86,7 +101,9 @@ def simulate_miner(
         reward_sats_block = subsidy_sats_block + FEE_SATS_PER_BLOCK
         reward_btc_block = reward_sats_block / SATS_PER_BTC
 
-        btc_reward_epoch[i] = reward_btc_block * blocks_per_epoch * share[i]
+        btc_reward_epoch[i] = (
+            reward_btc_block * blocks_per_epoch * share[i] * uptime_fraction
+        )
         sats_reward_epoch[i] = btc_reward_epoch[i] * SATS_PER_BTC
 
         revenue_epoch_usd = btc_reward_epoch[i] * btc_price[i]

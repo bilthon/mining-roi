@@ -5,6 +5,9 @@ from pathlib import Path
 from config import (
     BTC_PRICE_NOW_USD,
     CSV_PATH,
+    CURTAILMENT_ELECTRICITY_USD_PER_KWH,
+    CURTAILMENT_ENABLED,
+    CURTAILMENT_HOURS_PER_WEEK,
     DIFF_MIN_HEIGHT,
     ELECTRICITY_USD_PER_KWH,
     REDUCED_SLOPE_FACTOR,
@@ -60,6 +63,9 @@ def run_single_rig(rig_path: Path, diff_info: dict, args):
         efficiency_j_per_th=efficiency_j_per_th,
         equipment_price_usd=equipment_price_usd,
         electricity_usd_per_kwh=ELECTRICITY_USD_PER_KWH,
+        curtailment_enabled=CURTAILMENT_ENABLED,
+        curtailment_hours_per_week=CURTAILMENT_HOURS_PER_WEEK,
+        curtailment_electricity_usd_per_kwh=CURTAILMENT_ELECTRICITY_USD_PER_KWH,
         btc_price_now_usd=BTC_PRICE_NOW_USD,
         years_horizon=YEARS_HORIZON,
     )
@@ -77,6 +83,9 @@ def run_single_rig(rig_path: Path, diff_info: dict, args):
         efficiency_j_per_th=efficiency_j_per_th,
         equipment_price_usd=equipment_price_usd,
         electricity_usd_per_kwh=ELECTRICITY_USD_PER_KWH,
+        curtailment_enabled=CURTAILMENT_ENABLED,
+        curtailment_hours_per_week=CURTAILMENT_HOURS_PER_WEEK,
+        curtailment_electricity_usd_per_kwh=CURTAILMENT_ELECTRICITY_USD_PER_KWH,
         btc_price_now_usd=BTC_PRICE_NOW_USD,
         years_horizon=YEARS_HORIZON,
     )
@@ -117,6 +126,9 @@ def run_multi_rig(rigs_dir: Path, diff_info: dict, args):
             efficiency_j_per_th=efficiency_j_per_th,
             equipment_price_usd=equipment_price_usd,
             electricity_usd_per_kwh=ELECTRICITY_USD_PER_KWH,
+            curtailment_enabled=CURTAILMENT_ENABLED,
+            curtailment_hours_per_week=CURTAILMENT_HOURS_PER_WEEK,
+            curtailment_electricity_usd_per_kwh=CURTAILMENT_ELECTRICITY_USD_PER_KWH,
             btc_price_now_usd=BTC_PRICE_NOW_USD,
             years_horizon=YEARS_HORIZON,
         )
