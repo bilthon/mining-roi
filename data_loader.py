@@ -17,6 +17,8 @@ def load_all_rigs(directory: Path) -> List[dict]:
 
     rigs = []
     for rig_path in sorted(dir_path.glob("*.json")):
+        if rig_path.name.endswith(".sample"):
+            continue
         config = load_rig_config(rig_path)
         rigs.append({"path": rig_path, "config": config})
     return rigs
