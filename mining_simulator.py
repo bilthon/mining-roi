@@ -61,6 +61,8 @@ def simulate_miner(
     sats_reward_epoch = np.zeros(n_epochs)
     net_sats_epoch = np.zeros(n_epochs)
     net_usd_epoch = np.zeros(n_epochs)
+    daily_net_sats = np.zeros(n_epochs)
+    daily_net_usd = np.zeros(n_epochs)
     btc_reward_epoch = np.zeros(n_epochs)
 
     for i in range(n_epochs):
@@ -93,10 +95,14 @@ def simulate_miner(
         if net_usd <= 0:
             net_usd_epoch[i] = 0.0
             net_sats_epoch[i] = 0.0
+            daily_net_usd[i] = 0.0
+            daily_net_sats[i] = 0.0
         else:
             sats_per_usd_here = SATS_PER_BTC / btc_price[i]
             elec_epoch_sats = elec_cost_epoch_usd * sats_per_usd_here
             net_sats_epoch[i] = sats_reward_epoch[i] - elec_epoch_sats
+            daily_net_usd[i] = net_usd / days_per_epoch
+            daily_net_sats[i] = net_sats_epoch[i] / days_per_epoch
 
     cumulative_sats = -equipment_cost_sats + np.cumsum(net_sats_epoch)
     roi_indices = np.where(cumulative_sats >= 0)[0]
@@ -118,6 +124,8 @@ def simulate_miner(
             "sats_reward_epoch": sats_reward_epoch,
             "net_usd_epoch": net_usd_epoch,
             "net_sats_epoch": net_sats_epoch,
+            "daily_net_usd": daily_net_usd,
+            "daily_net_sats": daily_net_sats,
             "cumulative_sats": cumulative_sats,
             "cumulative_usd": cumulative_usd,
         }

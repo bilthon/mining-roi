@@ -17,6 +17,7 @@ from mining_simulator import simulate_miner
 from plotting import (
     plot_difficulty_projections,
     plot_multi_rig_comparison,
+    plot_daily_profit,
     plot_price_projection,
     plot_single_rig_roi,
 )
@@ -86,6 +87,8 @@ def run_single_rig(rig_path: Path, diff_info: dict, args):
     print("ROI epoch index in USD (reduced slope):", roi_usd_red)
 
     plot_single_rig_roi(name, df_orig, df_red)
+
+    plot_daily_profit(name, df_orig, plot_type="line")
 
     if args.price:
         plot_price_projection(df_orig, name)

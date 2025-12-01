@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Iterable
+from typing import Iterable, Literal
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
@@ -186,6 +186,48 @@ def plot_price_projection(df_orig, name: str) -> None:
     plt.ylabel("BTC price (USD)")
     plt.title(f"Projected BTC Price – Same Horizon as ROI Sim ({name})")
     plt.grid(True, which="both", axis="y")
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_daily_profit(
+    name: str,
+    df,
+    plot_type: Literal["line", "bar"] = "line",
+) -> None:
+    dates = df["date"]
+    sats = df["daily_net_sats"]
+    usd = df["daily_net_usd"]
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+
+    if plot_type == "bar":
+        ax1.bar(dates, sats, width=8.0, color="#ff7f0e")
+        ax2.bar(dates, usd, width=8.0, color="#2a851c")
+    else:
+        ax1.plot(dates, sats, label="Daily net sats", color="#ff7f0e")
+        ax2.plot(dates, usd, label="Daily net USD", color="#2a851c")
+
+    ax1.axhline(0, linestyle=":", color="#666666", linewidth=0.8)
+    ax2.axhline(0, linestyle=":", color="#666666", linewidth=0.8)
+
+    ax1.set_ylabel("Net sats / day")
+    ax2.set_ylabel("Net USD / day")
+    ax2.set_xlabel("Date")
+
+    ax1.set_title(f"{name} – Daily Mining Profit (Realistic Difficulty)")
+
+    if plot_type == "line":
+        ax1.legend()
+        ax2.legend()
+
+    ax1.grid(True, which="both", axis="y")
+    ax2.grid(True, which="both", axis="y")
+
+    light_grid = dict(which="both", color="#d0d0d0", linewidth=0.4, alpha=0.4)
+    ax1.grid(True, **light_grid)
+    ax2.grid(True, **light_grid)
+
     plt.tight_layout()
     plt.show()
 
