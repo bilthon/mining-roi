@@ -19,6 +19,3 @@ REDUCED_SLOPE_FACTOR = 0.75
 PL_A = 1.44e-17
 PL_B = 5.78
 GENESIS = datetime(2009, 1, 3, tzinfo=timezone.utc)
-
-SATS_PER_BTC = 100_000_000
-

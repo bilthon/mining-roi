@@ -5,9 +5,10 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 
-from config import FEE_SATS_PER_BLOCK, SATS_PER_BTC
+from config import FEE_SATS_PER_BLOCK
 from difficulty_model import btc_price_powerlaw, make_difficulty_func
 
+SATS_PER_BTC = 100_000_000
 
 def simulate_miner(
     difficulty_info: dict,
