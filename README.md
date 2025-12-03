@@ -22,9 +22,10 @@ btc-difficulty-mining/
 ├── data_loader.py               # Functions to load rig configs and difficulty data
 ├── difficulty_model.py          # Difficulty fitting and BTC price projection models
 ├── mining_simulator.py          # Core mining profitability simulation logic
-├── mining_roi_sim.py            # Main CLI script for running simulations
+├── main.py                      # Main CLI script for running simulations
 ├── plotting.py                  # Visualization functions
-├── export_difficulty_epochs.py  # Script to export difficulty data from Bitcoin Core
+├── scripts/
+│   └── export_difficulty_epochs.py  # Script to export difficulty data from Bitcoin Core
 ├── difficulty_epochs.csv        # Historical Bitcoin difficulty data
 └── rigs/                        # Mining rig configuration files (JSON)
     ├── s19_xp.json
@@ -145,19 +146,19 @@ Rig configurations are stored as JSON files in the `rigs/` directory. Each file 
 Run a simulation for all rigs in the `rigs/` directory:
 
 ```bash
-python mining_roi_sim.py
+python main.py
 ```
 
 Run a simulation for a specific rig:
 
 ```bash
-python mining_roi_sim.py rigs/s21_plus_225th.json
+python main.py rigs/s21_plus_225th.json
 ```
 
 ### Command-Line Options
 
 ```bash
-python mining_roi_sim.py [rig_config] [options]
+python main.py [rig_config] [options]
 ```
 
 **Arguments:**
@@ -173,19 +174,19 @@ python mining_roi_sim.py [rig_config] [options]
 Compare all rigs with difficulty and price projections:
 
 ```bash
-python mining_roi_sim.py --diff --price
+python main.py --diff --price
 ```
 
 Analyze a specific rig with all visualizations:
 
 ```bash
-python mining_roi_sim.py rigs/s21_plus_225th.json --diff --price
+python main.py rigs/s21_plus_225th.json --diff --price
 ```
 
 Use a custom rigs directory:
 
 ```bash
-python mining_roi_sim.py --rigs-dir ~/my-rigs
+python main.py --rigs-dir ~/my-rigs
 ```
 
 ## Exporting Difficulty Data
@@ -193,7 +194,7 @@ python mining_roi_sim.py --rigs-dir ~/my-rigs
 If you have Bitcoin Core running with RPC enabled, you can export difficulty data:
 
 ```bash
-python export_difficulty_epochs.py [output.csv]
+python scripts/export_difficulty_epochs.py [output.csv]
 ```
 
 **Environment Variables:**
