@@ -8,17 +8,17 @@ CONFIG_TOML = BASE_DIR / "config.toml"
 try:
     # Try tomllib (Python 3.11+)
     try:
-        import tomllib
+        import tomllib # type: ignore
         with open(CONFIG_TOML, "rb") as f:
             config = tomllib.load(f)
     except ImportError:
         # Fall back to tomli or toml for older Python versions
         try:
-            import tomli as tomllib
+            import tomli as tomllib # type: ignore
             with open(CONFIG_TOML, "rb") as f:
                 config = tomllib.load(f)
         except ImportError:
-            import toml
+            import toml # type: ignore
             with open(CONFIG_TOML, "r") as f:
                 config = toml.load(f)
     
