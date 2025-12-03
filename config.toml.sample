@@ -1,0 +1,26 @@
+[paths]
+csv_path = "difficulty_epochs.csv"
+rigs_dir = "rigs"
+
+[economics]
+electricity_usd_per_kwh = 0.05
+btc_price_now_usd = 90000.0
+fee_sats_per_block = 2000000
+
+[simulation]
+years_horizon = 4
+diff_min_height = 700000
+reduced_slope_factor = 0.75
+
+[curtailment]
+enabled = false
+hours_per_week = 144
+electricity_usd_per_kwh = 0.041
+
+[power_law]
+a = 1.44e-17
+b = 5.78
+
+[genesis]
+date = "2009-01-03T00:00:00Z"
+

@@ -1,5 +1,8 @@
 __pycache__/
 .venv
 
+# Local configuration file
+config.toml
+
 # Ignore specific rig files
 rigs/*.json

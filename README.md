@@ -16,7 +16,9 @@ A comprehensive Python tool for simulating Bitcoin mining profitability and retu
 
 ```
 btc-difficulty-mining/
-├── config.py                    # Configuration constants (electricity costs, BTC price, etc.)
+├── config.py                    # Configuration loader (loads from config.toml)
+├── config.toml.sample           # Sample configuration file (copy to config.toml)
+├── config.toml                  # Local configuration (gitignored, create from sample)
 ├── data_loader.py               # Functions to load rig configs and difficulty data
 ├── difficulty_model.py          # Difficulty fitting and BTC price projection models
 ├── mining_simulator.py          # Core mining profitability simulation logic
@@ -35,7 +37,7 @@ btc-difficulty-mining/
 
 ### Prerequisites
 
-- Python 3.7+
+- Python 3.7+ (Python 3.11+ recommended for built-in TOML support)
 - Bitcoin Core (optional, only needed for exporting difficulty data)
 
 ### Dependencies
@@ -46,6 +48,14 @@ Install the required Python packages:
 pip install pandas numpy matplotlib scikit-learn requests
 ```
 
+For Python versions < 3.11, you'll also need a TOML library:
+
+```bash
+pip install tomli  # For Python 3.7-3.10
+# OR
+pip install toml   # Alternative TOML library
+```
+
 Or create a `requirements.txt` file:
 
 ```txt
@@ -54,6 +64,7 @@ numpy>=1.20.0
 matplotlib>=3.3.0
 scikit-learn>=0.24.0
 requests>=2.25.0
+tomli>=2.0.0; python_version < "3.11"
 ```
 
 Then install:
@@ -64,21 +75,49 @@ pip install -r requirements.txt
 
 ## Configuration
 
-### Main Configuration (`config.py`)
+### Initial Setup
 
-Key parameters you can adjust in `config.py`:
+On first deployment, copy the sample configuration file:
 
-- `ELECTRICITY_USD_PER_KWH`: Your electricity cost (default: $0.05/kWh)
-- `BTC_PRICE_NOW_USD`: Current BTC price for anchoring projections (default: $90,000)
-- `YEARS_HORIZON`: Simulation time horizon (default: 4 years)
-- `DIFF_MIN_HEIGHT`: Minimum block height for difficulty fitting (default: 700,000)
-- `REDUCED_SLOPE_FACTOR`: Factor for reduced difficulty growth scenario (default: 0.75)
-- `FEE_SATS_PER_BLOCK`: Average transaction fees per block in satoshis (default: 1,000,000)
-- `CURTAILMENT_ENABLED`: Enable curtailed uptime modeling (default: `False`)
-- `CURTAILMENT_HOURS_PER_WEEK`: Number of hours each week the miner can operate when curtailment is enabled (default: 168)
-- `CURTAILMENT_ELECTRICITY_USD_PER_KWH`: Electricity price applied during the allowed runtime window (default: same as `ELECTRICITY_USD_PER_KWH`)
+```bash
+cp config.toml.sample config.toml
+```
 
-To represent a 120-hour cheap-power window, set `CURTAILMENT_ENABLED = True`, `CURTAILMENT_HOURS_PER_WEEK = 120`, and assign the discounted rate to `CURTAILMENT_ELECTRICITY_USD_PER_KWH`.
+Then edit `config.toml` with your preferred settings. The `config.toml` file is gitignored, so your local changes won't be tracked by git.
+
+### Main Configuration (`config.toml`)
+
+Key parameters you can adjust in `config.toml`:
+
+The configuration file uses TOML format with the following sections:
+
+**`[paths]`**
+- `csv_path`: Path to difficulty epochs CSV file (relative to project root)
+- `rigs_dir`: Directory containing rig configuration JSON files
+
+**`[economics]`**
+- `electricity_usd_per_kwh`: Your electricity cost (default: $0.05/kWh)
+- `btc_price_now_usd`: Current BTC price for anchoring projections (default: $90,000)
+- `fee_sats_per_block`: Average transaction fees per block in satoshis (default: 2,000,000)
+
+**`[simulation]`**
+- `years_horizon`: Simulation time horizon (default: 4 years)
+- `diff_min_height`: Minimum block height for difficulty fitting (default: 700,000)
+- `reduced_slope_factor`: Factor for reduced difficulty growth scenario (default: 0.75)
+
+**`[curtailment]`**
+- `enabled`: Enable curtailed uptime modeling (default: `false`)
+- `hours_per_week`: Number of hours each week the miner can operate when curtailment is enabled (default: 144)
+- `electricity_usd_per_kwh`: Electricity price applied during the allowed runtime window (default: $0.041/kWh)
+
+**`[power_law]`**
+- `a`: Power law constant A for BTC price projection (default: 1.44e-17)
+- `b`: Power law constant B for BTC price projection (default: 5.78)
+
+**`[genesis]`**
+- `date`: Bitcoin genesis block date in ISO format (default: "2009-01-03T00:00:00Z")
+
+To represent a 120-hour cheap-power window, set `[curtailment] enabled = true`, `hours_per_week = 120`, and assign the discounted rate to `electricity_usd_per_kwh`.
 
 ### Mining Rig Configuration
 
