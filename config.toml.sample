@@ -1,5 +1,5 @@
 [paths]
-csv_path = "difficulty_epochs.csv"
+csv_path = "data/difficulty_epochs.csv"
 rigs_dir = "rigs"
 
 [economics]

@@ -5,8 +5,8 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 
-from config import FEE_SATS_PER_BLOCK, HOURS_PER_WEEK
-from difficulty_model import btc_price_powerlaw, make_difficulty_func
+from .config import FEE_SATS_PER_BLOCK, HOURS_PER_WEEK
+from .difficulty_model import btc_price_powerlaw, make_difficulty_func
 
 SATS_PER_BTC = 100_000_000
 

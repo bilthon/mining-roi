@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.ticker import FuncFormatter
 
-from config import REDUCED_SLOPE_FACTOR, YEARS_HORIZON
+from .config import REDUCED_SLOPE_FACTOR, YEARS_HORIZON
 
 
 def plot_difficulty_projections(diff_info: dict) -> None:

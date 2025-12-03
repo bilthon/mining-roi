@@ -2,7 +2,7 @@
 import argparse
 from pathlib import Path
 
-from config import (
+from src.config import (
     BTC_PRICE_NOW_USD,
     CSV_PATH,
     CURTAILMENT_ELECTRICITY_USD_PER_KWH,
@@ -14,10 +14,10 @@ from config import (
     RIGS_DIR,
     YEARS_HORIZON,
 )
-from data_loader import load_all_rigs, load_difficulty_data, load_rig_config
-from difficulty_model import fit_difficulty_exp
-from mining_simulator import simulate_miner
-from plotting import (
+from src.data_loader import load_all_rigs, load_difficulty_data, load_rig_config
+from src.difficulty_model import fit_difficulty_exp
+from src.mining_simulator import simulate_miner
+from src.plotting import (
     plot_difficulty_projections,
     plot_multi_rig_comparison,
     plot_daily_profit,

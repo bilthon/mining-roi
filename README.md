@@ -16,17 +16,20 @@ A comprehensive Python tool for simulating Bitcoin mining profitability and retu
 
 ```
 btc-difficulty-mining/
-├── config.py                    # Configuration loader (loads from config.toml)
 ├── config.toml.sample           # Sample configuration file (copy to config.toml)
 ├── config.toml                  # Local configuration (gitignored, create from sample)
-├── data_loader.py               # Functions to load rig configs and difficulty data
-├── difficulty_model.py          # Difficulty fitting and BTC price projection models
-├── mining_simulator.py          # Core mining profitability simulation logic
 ├── main.py                      # Main CLI script for running simulations
-├── plotting.py                  # Visualization functions
+├── src/
+│   ├── __init__.py
+│   ├── config.py                # Configuration loader (loads from config.toml)
+│   ├── data_loader.py           # Functions to load rig configs and difficulty data
+│   ├── difficulty_model.py      # Difficulty fitting and BTC price projection models
+│   ├── mining_simulator.py      # Core mining profitability simulation logic
+│   └── plotting.py              # Visualization functions
 ├── scripts/
 │   └── export_difficulty_epochs.py  # Script to export difficulty data from Bitcoin Core
-├── difficulty_epochs.csv        # Historical Bitcoin difficulty data
+├── data/
+│   └── difficulty_epochs.csv    # Historical Bitcoin difficulty data
 └── rigs/                        # Mining rig configuration files (JSON)
     ├── s19_xp.json
     ├── s19j_pro.json
@@ -93,7 +96,7 @@ Key parameters you can adjust in `config.toml`:
 The configuration file uses TOML format with the following sections:
 
 **`[paths]`**
-- `csv_path`: Path to difficulty epochs CSV file (relative to project root)
+- `csv_path`: Path to difficulty epochs CSV file (relative to project root, default: `data/difficulty_epochs.csv`)
 - `rigs_dir`: Directory containing rig configuration JSON files
 
 **`[economics]`**

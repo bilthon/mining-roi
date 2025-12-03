@@ -2,7 +2,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 # Try to load TOML config, fall back to defaults if not found
-BASE_DIR = Path(__file__).parent
+# BASE_DIR should point at the project root, not the src/ folder
+BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_TOML = BASE_DIR / "config.toml"
 
 try:
@@ -50,7 +51,7 @@ try:
     
 except (FileNotFoundError, ImportError, KeyError):
     # Default configuration values (fallback)
-    CSV_PATH = BASE_DIR / "difficulty_epochs.csv"
+    CSV_PATH = BASE_DIR / "data" / "difficulty_epochs.csv"
     RIGS_DIR = BASE_DIR / "rigs"
 
     ELECTRICITY_USD_PER_KWH = 0.05

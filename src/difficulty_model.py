@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 
-from config import GENESIS, PL_A, PL_B
+from .config import GENESIS, PL_A, PL_B
 
 
 def fit_difficulty_exp(df: pd.DataFrame, min_height: int) -> dict:
