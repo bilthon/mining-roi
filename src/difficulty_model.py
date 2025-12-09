@@ -20,6 +20,9 @@ def fit_difficulty_exp(df: pd.DataFrame, min_height: int) -> dict:
     a = model.intercept_
     b = model.coef_[0]
 
+    df2["logD_pred"] = model.predict(X)
+    df2["residual"] = df2["logD"] - df2["logD_pred"]
+
     last = df2.iloc[-1]
     t0 = float(last["timestamp"])
     h0 = int(last["height"])
@@ -32,6 +35,7 @@ def fit_difficulty_exp(df: pd.DataFrame, min_height: int) -> dict:
         "h0": h0,
         "D0": D0,
         "df_fit": df2,
+        "residuals": df2["residual"].to_numpy(),
     }
 
 

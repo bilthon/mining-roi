@@ -218,6 +218,47 @@ def plot_price_projection(df_orig, name: str) -> None:
     plt.show()
 
 
+def plot_roi_cloud(sim_results) -> None:
+    """
+    Visualize Monte Carlo cumulative ROI bands and ROI epoch distribution.
+    sim_results: list of dicts containing a `df` DataFrame and `roi_sats_epoch`.
+    """
+    if not sim_results:
+        print("No Monte Carlo results to plot.")
+        return
+
+    dates = sim_results[0]["df"]["date"]
+    cumulative_stack = np.vstack([entry["df"]["cumulative_sats"].values for entry in sim_results])
+
+    p10 = np.percentile(cumulative_stack, 10, axis=0)
+    p50 = np.percentile(cumulative_stack, 50, axis=0)
+    p90 = np.percentile(cumulative_stack, 90, axis=0)
+
+    light_grid = dict(which="both", color="#d0d0d0", linewidth=0.4, alpha=0.4)
+    plt.figure(figsize=(12, 6))
+    plt.fill_between(dates, p10, p90, color="#c6dfee", alpha=0.6, label="P10–P90 cumulative sats")
+    plt.plot(dates, p50, color="#1f77b4", label="Median cumulative sats")
+    plt.axhline(0, linestyle=":", color="#666666", linewidth=0.8, label="Break-even (0 sats)")
+    plt.xlabel("Date")
+    plt.ylabel("Cumulative profit (sats)")
+    plt.title("Monte Carlo (random-walk) ROI – Cumulative Sats Bands")
+    plt.legend()
+    plt.grid(True, **light_grid)
+    plt.tight_layout()
+    plt.show()
+
+    roi_epochs = [entry.get("roi_sats_epoch") for entry in sim_results if entry.get("roi_sats_epoch") is not None]
+    if roi_epochs:
+        plt.figure(figsize=(10, 4))
+        plt.hist(roi_epochs, bins=20, color="#1f77b4", alpha=0.75, edgecolor="#1f3f5b")
+        plt.xlabel("Epoch index for ROI (sats)")
+        plt.ylabel("Frequency")
+        plt.title("Distribution of ROI Epochs (Random-Walk, Cumulative Sats >= 0)")
+        plt.grid(True, axis="y", **light_grid)
+        plt.tight_layout()
+        plt.show()
+
+
 def plot_daily_profit(
     name: str,
     df,

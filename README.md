@@ -8,6 +8,7 @@ A comprehensive Python tool for simulating Bitcoin mining profitability and retu
 - **Price Projections**: Projects BTC prices using a power law model anchored to current prices
 - **Multi-Rig Comparison**: Compare profitability across different mining rigs simultaneously
 - **Scenario Analysis**: Evaluate two difficulty growth scenarios (original slope vs. reduced slope)
+- **Monte Carlo (random-walk) Difficulty**: Run stochastic difficulty paths via a log-space random walk on fitted residuals to see ROI clouds and ROI-epoch distributions
 - **Comprehensive Metrics**: Track ROI in both satoshis and USD, including daily profit projections
 - **Visualizations**: Generate detailed charts for difficulty projections, cumulative profits, daily profits, and price forecasts
 - **Flexible Configuration**: Easily add new mining rigs via JSON configuration files
@@ -171,6 +172,8 @@ python main.py [rig_config] [options]
 - `--rigs-dir DIR`: Specify a custom directory containing rig JSON configs (default: `rigs/`)
 - `--diff`: Include difficulty projection plots
 - `--price`: Include BTC price projection plots
+- `--monte-carlo N`: Run N Monte Carlo random-walk difficulty scenarios (single-rig only)
+- `--mc-seed SEED`: Optional RNG seed for Monte Carlo sampling
 
 ### Examples
 
@@ -184,6 +187,12 @@ Analyze a specific rig with all visualizations:
 
 ```bash
 python main.py rigs/s21_plus_225th.json --diff --price
+```
+
+Run a Monte Carlo random-walk difficulty simulation for a single rig:
+
+```bash
+python main.py rigs/s21_plus_225th.json --monte-carlo 50 --mc-seed 42
 ```
 
 Use a custom rigs directory:
@@ -299,6 +308,12 @@ The simulator runs two scenarios:
 2. **Reduced Slope**: Uses a reduced growth rate (default: 75% of original)
 
 The reduced slope scenario provides a more conservative estimate, accounting for potential slowdowns in difficulty growth.
+
+### Monte Carlo (random-walk) Difficulty
+
+- Uses the fitted exponential slope as drift and adds a cumulative random walk in log-difficulty using bootstrapped residuals from the historical fit (starts at `log(D0)`).
+- Each simulation yields a full difficulty path that feeds the standard ROI simulator; BTC price modeling and halving logic are unchanged.
+- Outputs include percentile bands of cumulative sats over time and a histogram of ROI epochs (when cumulative sats crosses zero) across simulations.
 
 ### Key Metrics
 

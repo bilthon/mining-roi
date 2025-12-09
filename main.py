@@ -2,6 +2,8 @@
 import argparse
 from pathlib import Path
 
+import numpy as np
+
 from src.config import (
     BTC_PRICE_NOW_USD,
     CSV_PATH,
@@ -17,12 +19,14 @@ from src.config import (
 from src.data_loader import load_all_rigs, load_difficulty_data, load_rig_config
 from src.difficulty_model import fit_difficulty_exp
 from src.mining_simulator import simulate_miner
+from src.monte_carlo import run_monte_carlo_for_rig
 from src.plotting import (
     plot_difficulty_projections,
     plot_multi_rig_comparison,
     plot_daily_profit,
     plot_price_projection,
     plot_single_rig_roi,
+    plot_roi_cloud,
 )
 
 
@@ -36,6 +40,18 @@ def parse_args():
     )
     parser.add_argument("--diff", action="store_true", help="Include difficulty projection plot")
     parser.add_argument("--price", action="store_true", help="Include BTC price projection plot")
+    parser.add_argument(
+        "--monte-carlo",
+        type=int,
+        default=0,
+        help="Run Monte Carlo random-walk difficulty scenarios (value = number of simulations)",
+    )
+    parser.add_argument(
+        "--mc-seed",
+        type=int,
+        default=None,
+        help="Optional seed for Monte Carlo residual sampling",
+    )
     return parser.parse_args()
 
 
@@ -95,13 +111,53 @@ def run_single_rig(rig_path: Path, diff_info: dict, args):
     print("Final cumulative USD (reduced slope):", df_red["cumulative_usd"].iloc[-1])
     print("ROI epoch index in USD (reduced slope):", roi_usd_red)
 
-    plot_single_rig_roi(name, df_orig, df_red)
-
-    plot_daily_profit(name, df_orig, plot_type="line")
 
     if args.price:
         plot_price_projection(df_orig, name)
 
+    if args.monte_carlo and args.monte_carlo > 0:
+        print(f"\nRunning Monte Carlo (random-walk) simulations ({args.monte_carlo}) for {name} ...")
+        mc_result = run_monte_carlo_for_rig(
+            diff_info=diff_info,
+            rig=rig,
+            years_horizon=YEARS_HORIZON,
+            n_sims=args.monte_carlo,
+            slope_factor=1.0,
+            seed=args.mc_seed,
+            btc_price_now_usd=BTC_PRICE_NOW_USD,
+            electricity_usd_per_kwh=ELECTRICITY_USD_PER_KWH,
+            curtailment_enabled=CURTAILMENT_ENABLED,
+            curtailment_hours_per_week=CURTAILMENT_HOURS_PER_WEEK,
+            curtailment_electricity_usd_per_kwh=CURTAILMENT_ELECTRICITY_USD_PER_KWH,
+        )
+
+        summary = mc_result["summary"]
+        sats_stats = summary["final_sats"]
+        usd_stats = summary["final_usd"]
+
+        def percentile_label(stats: dict) -> str:
+            print('stats:', stats)
+            return f"P10={stats['p10']:.0f}, P50={stats['p50']:.0f}, P90={stats['p90']:.0f}"
+
+        print("Monte Carlo (random-walk) cumulative sats:", percentile_label(sats_stats))
+        print("Monte Carlo (random-walk) cumulative USD: ", percentile_label(usd_stats))
+
+        roi_epochs = summary["roi_sats_epochs"]
+        if roi_epochs:
+            roi_arr = np.asarray(roi_epochs, dtype=float)
+            print(
+                "ROI epoch (sats) percentiles:",
+                f"P10={np.percentile(roi_arr,10):.0f},",
+                f"P50={np.percentile(roi_arr,50):.0f},",
+                f"P90={np.percentile(roi_arr,90):.0f}",
+            )
+        else:
+            print("ROI epoch (sats): no simulations reached ROI within horizon (random-walk).")
+
+        plot_roi_cloud(mc_result["sim_results"])
+    else:
+        plot_single_rig_roi(name, df_orig, df_red)
+        plot_daily_profit(name, df_orig, plot_type="line")
 
 def run_multi_rig(rigs_dir: Path, diff_info: dict, args):
     rig_entries = load_all_rigs(rigs_dir)
@@ -158,6 +214,9 @@ def run_multi_rig(rigs_dir: Path, diff_info: dict, args):
 
     if args.price and rig_results:
         plot_price_projection(rig_results[0]["df"], "All rigs")
+
+    if args.monte_carlo and args.monte_carlo > 0:
+        print("Monte Carlo mode for multiple rigs is not supported yet; please specify a single rig config.")
 
 
 def main():

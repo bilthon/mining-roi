@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional, Tuple
+from typing import Optional, Sequence, Tuple
 from typing import Tuple
 
 import numpy as np
@@ -22,6 +22,10 @@ def simulate_miner(
     curtailment_enabled: bool = False,
     curtailment_hours_per_week: float = HOURS_PER_WEEK,
     curtailment_electricity_usd_per_kwh: Optional[float] = None,
+    difficulty_override: Optional[Sequence[float]] = None,
+    timestamps_override: Optional[Sequence[float]] = None,
+    heights_override: Optional[Sequence[float]] = None,
+    dates_override: Optional[Sequence[datetime]] = None,
 ) -> Tuple[pd.DataFrame, float, Optional[int], Optional[int]]:
     b_orig = difficulty_info["b"]
     t0 = difficulty_info["t0"]
@@ -37,13 +41,42 @@ def simulate_miner(
     epoch_seconds = blocks_per_epoch * 600
     seconds_per_year = 365 * 24 * 3600
 
-    total_seconds = years_horizon * seconds_per_year
-    n_epochs = int(total_seconds // epoch_seconds) + 1
+    if difficulty_override is not None:
+        difficulty = np.asarray(difficulty_override, dtype=float)
+        n_epochs = difficulty.shape[0]
+        epoch_idx = np.arange(n_epochs)
 
-    epoch_idx = np.arange(n_epochs)
-    timestamps = t0 + epoch_idx * epoch_seconds
-    dates = [datetime.fromtimestamp(ts, tz=timezone.utc) for ts in timestamps]
-    heights = h0 + epoch_idx * blocks_per_epoch
+        if timestamps_override is not None:
+            timestamps = np.asarray(timestamps_override, dtype=float)
+        else:
+            timestamps = t0 + epoch_idx * epoch_seconds
+
+        if heights_override is not None:
+            heights = np.asarray(heights_override, dtype=float)
+        else:
+            heights = h0 + epoch_idx * blocks_per_epoch
+
+        if timestamps.shape[0] != n_epochs:
+            raise ValueError("timestamps_override length does not match difficulty_override length")
+        if heights.shape[0] != n_epochs:
+            raise ValueError("heights_override length does not match difficulty_override length")
+
+        if dates_override is not None:
+            dates = list(dates_override)
+        else:
+            dates = [datetime.fromtimestamp(ts, tz=timezone.utc) for ts in timestamps]
+    else:
+        total_seconds = years_horizon * seconds_per_year
+        n_epochs = int(total_seconds // epoch_seconds) + 1
+
+        epoch_idx = np.arange(n_epochs)
+        timestamps = t0 + epoch_idx * epoch_seconds
+        dates = [datetime.fromtimestamp(ts, tz=timezone.utc) for ts in timestamps]
+        heights = h0 + epoch_idx * blocks_per_epoch
+
+        b_scaled = b_orig * slope_factor
+        D_func = make_difficulty_func(D0, t0, b_scaled)
+        difficulty = D_func(timestamps)
 
     btc_price = btc_price_powerlaw(dates, anchor_price_now=btc_price_now_usd)
 
@@ -70,7 +103,6 @@ def simulate_miner(
     equipment_cost_sats = equipment_price_usd * sats_per_usd_now
     equipment_cost_usd = equipment_price_usd
 
-    difficulty = np.zeros(n_epochs)
     Hnet = np.zeros(n_epochs)
     share = np.zeros(n_epochs)
     subsidy_btc = np.zeros(n_epochs)
@@ -82,8 +114,6 @@ def simulate_miner(
     btc_reward_epoch = np.zeros(n_epochs)
 
     for i in range(n_epochs):
-        t = timestamps[i]
-        difficulty[i] = D_func(t)
         Hnet[i] = difficulty[i] * (2**32) / 600.0
         share[i] = hashrate_hs / Hnet[i]
 
