@@ -76,12 +76,26 @@ def plot_difficulty_projections(diff_info: dict) -> None:
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6), sharex=True)
     light_grid = dict(which="both", color="#d0d0d0", linewidth=0.4, alpha=0.4)
 
-    ax1.plot(df_700k["height"], df_700k["difficulty"], label="Real difficulty (≥700k)")
-    ax1.plot(h_future, D_future_orig, "--", label="Projection: original slope")
-    ax1.plot(
+    ax1.step(
+        df_700k["height"],
+        df_700k["difficulty"],
+        where="post",
+        label="Real difficulty (≥700k)",
+    )
+    ax1.step(
+        h_future,
+        D_future_orig,
+        where="post",
+        color="#6aaed6",
+        linewidth=1.6,
+        label="Projection: original slope",
+    )
+    ax1.step(
         h_future,
         D_future_red,
-        ":",
+        where="post",
+        color="#f4a261",
+        linewidth=1.6,
         label=f"Projection: reduced slope ({REDUCED_SLOPE_FACTOR:.2f}×)",
     )
     ax1.set_yscale("log")
@@ -99,12 +113,26 @@ def plot_difficulty_projections(diff_info: dict) -> None:
     ax1_top.xaxis.set_minor_locator(mdates.MonthLocator((1, 7)))
     ax1_top.tick_params(labelsize=8)
 
-    ax2.plot(df_700k["height"], df_700k["difficulty"], label="Real difficulty (≥700k)")
-    ax2.plot(h_future, D_future_orig, "--", label="Projection: original slope")
-    ax2.plot(
+    ax2.step(
+        df_700k["height"],
+        df_700k["difficulty"],
+        where="post",
+        label="Real difficulty (≥700k)",
+    )
+    ax2.step(
+        h_future,
+        D_future_orig,
+        where="post",
+        color="#6aaed6",
+        linewidth=1.6,
+        label="Projection: original slope",
+    )
+    ax2.step(
         h_future,
         D_future_red,
-        ":",
+        where="post",
+        color="#f4a261",
+        linewidth=1.6,
         label=f"Projection: reduced slope ({REDUCED_SLOPE_FACTOR:.2f}×)",
     )
     ax2.yaxis.set_major_formatter(FuncFormatter(difficulty_formatter))
