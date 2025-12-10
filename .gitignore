@@ -6,3 +6,5 @@ config.toml
 
 # Ignore specific rig files
 rigs/*.json
+
+.cursor
