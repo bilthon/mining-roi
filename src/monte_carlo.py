@@ -42,6 +42,23 @@ def _build_timeline(diff_info: Dict, years_horizon: int) -> Dict[str, np.ndarray
     }
 
 
+def _enforce_difficulty_change_bounds(
+    difficulty: np.ndarray, min_ratio: float = 0.25, max_ratio: float = 4.0
+) -> np.ndarray:
+    adjusted = difficulty.copy()
+    for i in range(1, adjusted.shape[0]):
+        prev = adjusted[i - 1]
+        if prev <= 0:
+            continue
+        upper = prev * max_ratio
+        lower = prev * min_ratio
+        if adjusted[i] > upper:
+            adjusted[i] = upper
+        elif adjusted[i] < lower:
+            adjusted[i] = lower
+    return adjusted
+
+
 def generate_difficulty_paths(
     diff_info: Dict,
     years_horizon: int = YEARS_HORIZON,
@@ -70,7 +87,8 @@ def generate_difficulty_paths(
             seed=sim_seed,
         )
         logD_path = base_logD + np.cumsum(res)
-        difficulty_paths[i] = np.exp(logD_path)
+        difficulty_path = np.exp(logD_path)
+        difficulty_paths[i] = _enforce_difficulty_change_bounds(difficulty_path)
 
     return difficulty_paths, timeline
 
