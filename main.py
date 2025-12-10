@@ -28,6 +28,7 @@ from src.plotting import (
     plot_price_projection,
     plot_single_rig_roi,
     plot_roi_cloud,
+    plot_difficulty_mc_paths,
 )
 
 
@@ -64,6 +65,12 @@ def parse_args():
         type=str,
         default=None,
         help='Comma-separated percentile bands for ROI cloud (e.g., "10-90,25-75")',
+    )
+    parser.add_argument(
+        "--mc-show-difficulty",
+        type=int,
+        default=0,
+        help="Number of Monte Carlo difficulty paths to overlay on historical difficulty",
     )
     return parser.parse_args()
 
@@ -190,6 +197,15 @@ def run_single_rig(rig_path: Path, diff_info: dict, args):
             show_paths=max(0, int(args.mc_show_paths)),
             bands=parse_mc_bands(args.mc_bands),
         )
+
+        if args.mc_show_difficulty and args.mc_show_difficulty > 0:
+            plot_difficulty_mc_paths(
+                diff_info["df_fit"],
+                mc_result["difficulty_paths"],
+                mc_result["timeline"]["heights"],
+                max_paths=args.mc_show_difficulty,
+                title="Historical vs Monte Carlo Difficulty (Random-Walk)",
+            )
     else:
         plot_single_rig_roi(name, df_orig, df_red)
         plot_daily_profit(name, df_orig, plot_type="line")

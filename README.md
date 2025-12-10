@@ -176,6 +176,7 @@ python main.py [rig_config] [options]
 - `--mc-seed SEED`: Optional RNG seed for Monte Carlo sampling
 - `--mc-show-paths N`: Overlay N individual Monte Carlo cumulative-sats paths on the ROI plot
 - `--mc-bands LIST`: Comma-separated percentile bands for ROI cloud (e.g., `10-90,25-75`)
+- `--mc-show-difficulty N`: Overlay N Monte Carlo difficulty trajectories on the historical difficulty step plot
 
 ### Examples
 
@@ -201,6 +202,12 @@ Show sample paths and custom bands:
 
 ```bash
 python main.py rigs/s21_plus_225th.json --monte-carlo 50 --mc-show-paths 5 --mc-bands "5-95,25-75"
+```
+
+Show difficulty trajectories used in Monte Carlo:
+
+```bash
+python main.py rigs/s21_plus_225th.json --monte-carlo 50 --mc-show-difficulty 5
 ```
 
 Use a custom rigs directory:

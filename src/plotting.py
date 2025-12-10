@@ -294,6 +294,51 @@ def plot_roi_cloud(
         plt.show()
 
 
+def plot_difficulty_mc_paths(
+    df_hist,
+    mc_paths: np.ndarray,
+    heights: np.ndarray,
+    max_paths: int = 0,
+    title: str = "Monte Carlo Difficulty Paths (Random-Walk)",
+) -> None:
+    """
+    Step-plot historical difficulty and overlay sample Monte Carlo difficulty trajectories.
+    mc_paths shape: (n_sims, n_epochs)
+    heights shape: (n_epochs,)
+    """
+    if mc_paths.size == 0 or heights.size == 0:
+        print("No Monte Carlo difficulty paths to plot.")
+        return
+
+    n_paths = min(max_paths, mc_paths.shape[0]) if max_paths and max_paths > 0 else 0
+
+    light_grid = dict(which="both", color="#d0d0d0", linewidth=0.4, alpha=0.4)
+    plt.figure(figsize=(12, 6))
+
+    # Historical
+    plt.step(df_hist["height"], df_hist["difficulty"], where="post", label="Historical difficulty (fit window)")
+
+    # Sample MC paths
+    for path_idx in range(n_paths):
+        plt.step(
+            heights,
+            mc_paths[path_idx],
+            where="post",
+            linewidth=0.9,
+            alpha=0.55,
+            label="MC difficulty path" if path_idx == 0 else None,
+        )
+
+    plt.yscale("log")
+    plt.xlabel("Block height")
+    plt.ylabel("Difficulty (log scale)")
+    plt.title(title)
+    plt.legend()
+    plt.grid(True, **light_grid)
+    plt.tight_layout()
+    plt.show()
+
+
 def plot_daily_profit(
     name: str,
     df,
