@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 
@@ -52,6 +53,18 @@ def parse_args():
         default=None,
         help="Optional seed for Monte Carlo residual sampling",
     )
+    parser.add_argument(
+        "--mc-show-paths",
+        type=int,
+        default=0,
+        help="Number of individual Monte Carlo paths to overlay (0 = none)",
+    )
+    parser.add_argument(
+        "--mc-bands",
+        type=str,
+        default=None,
+        help='Comma-separated percentile bands for ROI cloud (e.g., "10-90,25-75")',
+    )
     return parser.parse_args()
 
 
@@ -60,6 +73,24 @@ def print_rig_summary(name, hashrate_ths, efficiency_j_per_th, equipment_price_u
     print(f"  Hashrate:   {hashrate_ths} TH/s")
     print(f"  Efficiency: {efficiency_j_per_th} J/TH")
     print(f"  Price:      ${equipment_price_usd}")
+
+
+def parse_mc_bands(bands_str: Optional[str]):
+    if not bands_str:
+        return None
+    bands = []
+    for part in bands_str.split(","):
+        if "-" not in part:
+            continue
+        lo_str, hi_str = part.split("-", 1)
+        try:
+            lo = float(lo_str)
+            hi = float(hi_str)
+        except ValueError:
+            continue
+        if 0 <= lo < hi <= 100:
+            bands.append((lo, hi))
+    return bands if bands else None
 
 
 def run_single_rig(rig_path: Path, diff_info: dict, args):
@@ -154,7 +185,11 @@ def run_single_rig(rig_path: Path, diff_info: dict, args):
         else:
             print("ROI epoch (sats): no simulations reached ROI within horizon (random-walk).")
 
-        plot_roi_cloud(mc_result["sim_results"])
+        plot_roi_cloud(
+            mc_result["sim_results"],
+            show_paths=max(0, int(args.mc_show_paths)),
+            bands=parse_mc_bands(args.mc_bands),
+        )
     else:
         plot_single_rig_roi(name, df_orig, df_red)
         plot_daily_profit(name, df_orig, plot_type="line")

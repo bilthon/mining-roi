@@ -174,6 +174,8 @@ python main.py [rig_config] [options]
 - `--price`: Include BTC price projection plots
 - `--monte-carlo N`: Run N Monte Carlo random-walk difficulty scenarios (single-rig only)
 - `--mc-seed SEED`: Optional RNG seed for Monte Carlo sampling
+- `--mc-show-paths N`: Overlay N individual Monte Carlo cumulative-sats paths on the ROI plot
+- `--mc-bands LIST`: Comma-separated percentile bands for ROI cloud (e.g., `10-90,25-75`)
 
 ### Examples
 
@@ -193,6 +195,12 @@ Run a Monte Carlo random-walk difficulty simulation for a single rig:
 
 ```bash
 python main.py rigs/s21_plus_225th.json --monte-carlo 50 --mc-seed 42
+```
+
+Show sample paths and custom bands:
+
+```bash
+python main.py rigs/s21_plus_225th.json --monte-carlo 50 --mc-show-paths 5 --mc-bands "5-95,25-75"
 ```
 
 Use a custom rigs directory:

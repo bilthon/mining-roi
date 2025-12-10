@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Iterable, Literal
+from typing import Iterable, Literal, Optional, Sequence, Tuple
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
@@ -218,7 +218,11 @@ def plot_price_projection(df_orig, name: str) -> None:
     plt.show()
 
 
-def plot_roi_cloud(sim_results) -> None:
+def plot_roi_cloud(
+    sim_results,
+    show_paths: int = 0,
+    bands: Optional[Sequence[Tuple[float, float]]] = None,
+) -> None:
     """
     Visualize Monte Carlo cumulative ROI bands and ROI epoch distribution.
     sim_results: list of dicts containing a `df` DataFrame and `roi_sats_epoch`.
@@ -227,17 +231,35 @@ def plot_roi_cloud(sim_results) -> None:
         print("No Monte Carlo results to plot.")
         return
 
+    if bands is None or len(bands) == 0:
+        bands = [(10, 90)]
+
+    # Ensure bands are well-formed and sorted by width (outer to inner)
+    cleaned = []
+    for lo, hi in bands:
+        lo_f, hi_f = float(lo), float(hi)
+        if not (0 <= lo_f < hi_f <= 100):
+            continue
+        cleaned.append((lo_f, hi_f))
+    if not cleaned:
+        cleaned = [(10.0, 90.0)]
+    bands_sorted = sorted(cleaned, key=lambda x: x[1] - x[0], reverse=True)
+
     dates = sim_results[0]["df"]["date"]
     cumulative_stack = np.vstack([entry["df"]["cumulative_sats"].values for entry in sim_results])
 
-    p10 = np.percentile(cumulative_stack, 10, axis=0)
-    p50 = np.percentile(cumulative_stack, 50, axis=0)
-    p90 = np.percentile(cumulative_stack, 90, axis=0)
+    percentiles = {p: np.percentile(cumulative_stack, p, axis=0) for p in set([50] + [p for band in bands_sorted for p in band])}
+    p50 = percentiles[50]
 
     light_grid = dict(which="both", color="#d0d0d0", linewidth=0.4, alpha=0.4)
     plt.figure(figsize=(12, 6))
-    plt.fill_between(dates, p10, p90, color="#c6dfee", alpha=0.6, label="P10–P90 cumulative sats")
-    plt.plot(dates, p50, color="#1f77b4", label="Median cumulative sats")
+    base_color = "#1f77b4"
+    for idx, (lo, hi) in enumerate(bands_sorted):
+        plo = percentiles[lo]
+        phi = percentiles[hi]
+        alpha = 0.18 + 0.10 * max(0, len(bands_sorted) - idx)
+        plt.fill_between(dates, plo, phi, color="#c6dfee", alpha=min(alpha, 0.6), label=f"P{int(lo)}–P{int(hi)} cumulative sats")
+    plt.plot(dates, p50, color=base_color, linewidth=1.6, label="Median cumulative sats")
     plt.axhline(0, linestyle=":", color="#666666", linewidth=0.8, label="Break-even (0 sats)")
     plt.xlabel("Date")
     plt.ylabel("Cumulative profit (sats)")
@@ -246,6 +268,19 @@ def plot_roi_cloud(sim_results) -> None:
     plt.grid(True, **light_grid)
     plt.tight_layout()
     plt.show()
+
+    if show_paths > 0:
+        n_paths = min(show_paths, len(sim_results))
+        plt.figure(figsize=(12, 6))
+        for entry in sim_results[:n_paths]:
+            plt.plot(entry["df"]["date"], entry["df"]["cumulative_sats"], linewidth=0.9, alpha=0.8, color="#1f77b4")
+        plt.axhline(0, linestyle=":", color="#666666", linewidth=0.8, label="Break-even (0 sats)")
+        plt.xlabel("Date")
+        plt.ylabel("Cumulative profit (sats)")
+        plt.title(f"Monte Carlo (random-walk) ROI – Sample Paths (n={n_paths})")
+        plt.grid(True, **light_grid)
+        plt.tight_layout()
+        plt.show()
 
     roi_epochs = [entry.get("roi_sats_epoch") for entry in sim_results if entry.get("roi_sats_epoch") is not None]
     if roi_epochs:
