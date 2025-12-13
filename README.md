@@ -24,6 +24,11 @@ Whether you're evaluating a single rig purchase or comparing multiple options un
 - **Visualizations**: ROI clouds, sample paths, difficulty-path overlays, and price forecasts
 - **Flexible configuration**: Easily add new mining rigs via JSON configuration files
 
+## Screenshots
+<img width="1200" height="600" alt="T21-roi" src="https://github.com/user-attachments/assets/ebdd6cb0-9f0e-458a-8650-fc4d4aa8b4e5" />
+<img width="1000" height="400" alt="t21-roi-hist" src="https://github.com/user-attachments/assets/d99dac5e-70ef-4f6e-bd3d-268d67972073" />
+
+
 ## Project Structure
 
 ```
