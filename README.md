@@ -2,9 +2,15 @@
 
 **Does that rig price make sense? Monte Carlo simulations reveal the answer.**
 
-The core question every miner faces: **Is this mining rig worth the price?** Traditional calculators give you a single number, but Bitcoin's future is uncertain—difficulty growth, price volatility, and network dynamics create a complex landscape where point estimates fall short.
+The core question every miner faces: **Is this mining rig worth the price?** Traditional calculators give you a static snapshot and project ROI (Return on Investment) based on that. But we all know that this is dependent on Bitcoin's difficulty staying constant—something that almost certainly will not be true. The real question then becomes: how will difficulty evolve?
 
-This simulator uses **Monte Carlo methods** to explore thousands of possible futures, answering the rig-price question with probabilistic rigor. By modeling difficulty growth as a stochastic process with bootstrapped historical residuals, we generate realistic scenarios that capture the randomness of Bitcoin's network evolution. Each simulation runs a full mining timeline, accounting for halvings, price projections, and electricity costs, producing comprehensive ROI distributions that show you the probability of breaking even—or not.
+This simulator was born of the desire to have more realistic earnings projections by taking into consideration the historical trajectory of Bitcoin's mining difficulty. The main idea is to take the historical data, find a curve that best fits it, and then run simulations with the difficulty evolving based on that curve.
+
+This method is OK, but it only gives you a single result. The projected difficulty path, while useful for obtaining the most likely future development, tells us very little about the range of different probable scenarios. Here is where Monte Carlo comes in.
+
+### Monte Carlo Simulations
+
+Instead of running a single simulation, we run several. Each one follows a different difficulty path (some grow faster, some slower) all based on patterns we've observed in Bitcoin's history. We take that fitted curve and add realistic randomness to it, creating a whole spectrum of possible futures. For each scenario, we simulate the complete mining journey. When you're done, you don't get a single "most likely" answer—you get a probability distribution that shows you the odds of breaking even, the range of possible outcomes, and ultimately, whether that rig price makes sense.
 
 Whether you're evaluating a single rig purchase or comparing multiple options under shared difficulty scenarios, this tool transforms uncertainty into actionable probability distributions that directly address: **Does this rig price make sense?**
 
