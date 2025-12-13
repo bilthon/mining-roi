@@ -19,6 +19,7 @@ def plot_roi_cloud(
     sim_results,
     show_paths: int = 0,
     bands: Optional[Sequence[Tuple[float, float]]] = None,
+    name: Optional[str] = None,
 ) -> None:
     """
     Visualize Monte Carlo cumulative ROI bands and ROI epoch distribution.
@@ -60,7 +61,8 @@ def plot_roi_cloud(
     plt.axhline(0, linestyle=":", color="#666666", linewidth=0.8, label="Break-even (0 sats)")
     plt.xlabel("Date")
     plt.ylabel("Cumulative profit (sats)")
-    plt.title("Monte Carlo (random-walk) ROI – Cumulative Sats Bands")
+    title_prefix = f"{name} – " if name else ""
+    plt.title(f"{title_prefix}Monte Carlo (random-walk) ROI – Cumulative Sats Bands")
     plt.legend()
     plt.grid(True, **light_grid)
     plt.tight_layout()
@@ -74,7 +76,7 @@ def plot_roi_cloud(
         plt.axhline(0, linestyle=":", color="#666666", linewidth=0.8, label="Break-even (0 sats)")
         plt.xlabel("Date")
         plt.ylabel("Cumulative profit (sats)")
-        plt.title(f"Monte Carlo (random-walk) ROI – Sample Paths (n={n_paths})")
+        plt.title(f"{title_prefix}Monte Carlo (random-walk) ROI – Sample Paths (n={n_paths})")
         plt.grid(True, **light_grid)
         plt.tight_layout()
         plt.show()
@@ -85,7 +87,7 @@ def plot_roi_cloud(
         plt.hist(roi_epochs, bins=20, color="#1f77b4", alpha=0.75, edgecolor="#1f3f5b")
         plt.xlabel("Epoch index for ROI (sats)")
         plt.ylabel("Frequency")
-        plt.title("Distribution of ROI Epochs (Random-Walk, Cumulative Sats >= 0)")
+        plt.title(f"{title_prefix}Distribution of ROI Epochs (Random-Walk, Cumulative Sats >= 0)")
         plt.grid(True, axis="y", **light_grid)
         plt.tight_layout()
         plt.show()
@@ -147,7 +149,14 @@ def plot_multi_rig_mc_comparison(
     plt.axhline(0, linestyle=":", color="#666666", linewidth=0.8, label="Break-even (0 sats)")
     plt.xlabel("Date")
     plt.ylabel("Cumulative profit (sats)")
-    plt.title("Monte Carlo ROI – Multi-Rig Comparison")
+
+    rig_names = list(multi_rig_results.keys())
+    if len(rig_names) <= 4:
+        names_label = ", ".join(rig_names)
+    else:
+        names_label = ", ".join(rig_names[:3]) + f", +{len(rig_names) - 3} more"
+
+    plt.title(f"Monte Carlo ROI – Multi-Rig Comparison ({names_label})")
     plt.legend()
     plt.grid(True, **light_grid)
     plt.tight_layout()

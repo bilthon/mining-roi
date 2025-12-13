@@ -175,6 +175,7 @@ def run_single_rig_mc(rig_path: Path, diff_info: dict, args):
         mc_result["sim_results"],
         show_paths=max(0, int(args.mc_show_paths)),
         bands=bands,
+        name=name,
     )
 
     max_paths = max(0, int(args.mc_show_difficulty))
@@ -187,7 +188,7 @@ def run_single_rig_mc(rig_path: Path, diff_info: dict, args):
             mc_result["difficulty_paths"],
             mc_result["timeline"]["heights"],
             max_paths=max_paths,
-            title="Historical vs Monte Carlo Difficulty (Random-Walk)",
+            title=f"{name} – Historical vs Monte Carlo Difficulty (Random-Walk)",
         )
 
     if args.price:
@@ -252,12 +253,18 @@ def run_multi_rig_mc(rigs_dir: Path, diff_info: dict, args):
 
     if max_paths > 0:
         first_result = next(iter(mc_results.values()))
+        rig_names = list(mc_results.keys())
+        if len(rig_names) <= 4:
+            names_label = ", ".join(rig_names)
+        else:
+            names_label = ", ".join(rig_names[:3]) + f", +{len(rig_names) - 3} more"
+
         plot_difficulty_mc_paths(
             diff_info["df_fit"],
             first_result["difficulty_paths"],
             first_result["timeline"]["heights"],
             max_paths=max_paths,
-            title="Historical vs Monte Carlo Difficulty (Random-Walk)",
+            title=f"Historical vs Monte Carlo Difficulty (Random-Walk) – {names_label}",
         )
 
     if args.price:
