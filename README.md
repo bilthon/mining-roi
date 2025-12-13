@@ -1,6 +1,12 @@
 # Bitcoin Mining ROI Simulator
 
-A comprehensive Python tool for simulating Bitcoin mining profitability and return on investment (ROI) over time. This simulator models Bitcoin difficulty growth, projects BTC prices, and calculates mining profitability for various mining rigs, helping you make informed decisions about mining equipment investments.
+**Does that rig price make sense? Monte Carlo simulations reveal the answer.**
+
+The core question every miner faces: **Is this mining rig worth the price?** Traditional calculators give you a single number, but Bitcoin's future is uncertain—difficulty growth, price volatility, and network dynamics create a complex landscape where point estimates fall short.
+
+This simulator uses **Monte Carlo methods** to explore thousands of possible futures, answering the rig-price question with probabilistic rigor. By modeling difficulty growth as a stochastic process with bootstrapped historical residuals, we generate realistic scenarios that capture the randomness of Bitcoin's network evolution. Each simulation runs a full mining timeline, accounting for halvings, price projections, and electricity costs, producing comprehensive ROI distributions that show you the probability of breaking even—or not.
+
+Whether you're evaluating a single rig purchase or comparing multiple options under shared difficulty scenarios, this tool transforms uncertainty into actionable probability distributions that directly address: **Does this rig price make sense?**
 
 ## Features
 
