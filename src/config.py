@@ -31,9 +31,13 @@ try:
     BTC_PRICE_NOW_USD = float(config["economics"]["btc_price_now_usd"])
     FEE_SATS_PER_BLOCK = int(config["economics"]["fee_sats_per_block"])
     
-    YEARS_HORIZON = int(config["simulation"]["years_horizon"])
-    DIFF_MIN_HEIGHT = int(config["simulation"]["diff_min_height"])
-    REDUCED_SLOPE_FACTOR = float(config["simulation"]["reduced_slope_factor"])
+    simulation_cfg = config["simulation"]
+    YEARS_HORIZON = int(simulation_cfg["years_horizon"])
+    DIFF_MIN_HEIGHT = int(simulation_cfg["diff_min_height"])
+    DEFAULT_MC_SIMULATIONS = int(simulation_cfg.get("default_mc_simulations", 100))
+    mc_seed_val = simulation_cfg.get("mc_default_seed", None)
+    MC_DEFAULT_SEED = int(mc_seed_val) if mc_seed_val is not None else None
+    MC_DEFAULT_BANDS = simulation_cfg.get("mc_default_bands", None)
     
     HOURS_PER_WEEK = 7 * 24
     CURTAILMENT_ENABLED = bool(config["curtailment"]["enabled"])
@@ -61,8 +65,6 @@ except (FileNotFoundError, ImportError, KeyError):
     YEARS_HORIZON = 4
     DIFF_MIN_HEIGHT = 700_000
 
-    REDUCED_SLOPE_FACTOR = 0.75
-
     HOURS_PER_WEEK = 7 * 24
     CURTAILMENT_ENABLED = False
     CURTAILMENT_HOURS_PER_WEEK = 144
@@ -71,3 +73,6 @@ except (FileNotFoundError, ImportError, KeyError):
     PL_A = 1.44e-17
     PL_B = 5.78
     GENESIS = datetime(2009, 1, 3, tzinfo=timezone.utc)
+    DEFAULT_MC_SIMULATIONS = 100
+    MC_DEFAULT_SEED = None
+    MC_DEFAULT_BANDS = "10-90,25-75"

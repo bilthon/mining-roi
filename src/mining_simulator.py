@@ -12,7 +12,6 @@ SATS_PER_BTC = 100_000_000
 
 def simulate_miner(
     difficulty_info: dict,
-    slope_factor: float,
     hashrate_ths: float,
     efficiency_j_per_th: float,
     equipment_price_usd: float,
@@ -32,8 +31,7 @@ def simulate_miner(
     h0 = difficulty_info["h0"]
     D0 = difficulty_info["D0"]
 
-    b_scaled = b_orig * slope_factor
-    D_func = make_difficulty_func(D0, t0, b_scaled)
+    D_func = make_difficulty_func(D0, t0, b_orig)
 
     blocks_per_epoch = 2016
     blocks_per_day = 144
@@ -74,8 +72,6 @@ def simulate_miner(
         dates = [datetime.fromtimestamp(ts, tz=timezone.utc) for ts in timestamps]
         heights = h0 + epoch_idx * blocks_per_epoch
 
-        b_scaled = b_orig * slope_factor
-        D_func = make_difficulty_func(D0, t0, b_scaled)
         difficulty = D_func(timestamps)
 
     btc_price = btc_price_powerlaw(dates, anchor_price_now=btc_price_now_usd)

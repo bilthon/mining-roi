@@ -4,14 +4,13 @@ A comprehensive Python tool for simulating Bitcoin mining profitability and retu
 
 ## Features
 
-- **Difficulty Modeling**: Uses exponential regression to model Bitcoin difficulty growth based on historical data
-- **Price Projections**: Projects BTC prices using a power law model anchored to current prices
-- **Multi-Rig Comparison**: Compare profitability across different mining rigs simultaneously
-- **Scenario Analysis**: Evaluate two difficulty growth scenarios (original slope vs. reduced slope)
-- **Monte Carlo (random-walk) Difficulty**: Run stochastic difficulty paths via a log-space random walk on fitted residuals to see ROI clouds and ROI-epoch distributions
-- **Comprehensive Metrics**: Track ROI in both satoshis and USD, including daily profit projections
-- **Visualizations**: Generate detailed charts for difficulty projections, cumulative profits, daily profits, and price forecasts
-- **Flexible Configuration**: Easily add new mining rigs via JSON configuration files
+- **Monte Carlo-first difficulty**: Stochastic difficulty paths via log-space random walk on fitted residuals (primary analysis)
+- **Difficulty modeling**: Exponential regression fit to historical data as the drift for Monte Carlo paths
+- **Price projections**: Power law model anchored to current prices
+- **Multi-rig Monte Carlo comparison**: Run the same difficulty scenarios across multiple rigs for fair comparisons
+- **ROI distributions**: Percentiles for final sats/USD and ROI-epoch distributions
+- **Visualizations**: ROI clouds, sample paths, difficulty-path overlays, and price forecasts
+- **Flexible configuration**: Easily add new mining rigs via JSON configuration files
 
 ## Project Structure
 
@@ -108,7 +107,9 @@ The configuration file uses TOML format with the following sections:
 **`[simulation]`**
 - `years_horizon`: Simulation time horizon (default: 4 years)
 - `diff_min_height`: Minimum block height for difficulty fitting (default: 700,000)
-- `reduced_slope_factor`: Factor for reduced difficulty growth scenario (default: 0.75)
+- `default_mc_simulations`: Default number of Monte Carlo simulations (default: 100)
+- `mc_default_seed`: Optional default RNG seed for Monte Carlo (can be omitted)
+- `mc_default_bands`: Default percentile bands for ROI plots (e.g., `"10-90,25-75"`)
 
 **`[curtailment]`**
 - `enabled`: Enable curtailed uptime modeling (default: `false`)
@@ -170,9 +171,9 @@ python main.py [rig_config] [options]
 
 **Options:**
 - `--rigs-dir DIR`: Specify a custom directory containing rig JSON configs (default: `rigs/`)
-- `--diff`: Include difficulty projection plots
-- `--price`: Include BTC price projection plots
-- `--monte-carlo N`: Run N Monte Carlo random-walk difficulty scenarios (single-rig only)
+- `--diff`: Overlay Monte Carlo difficulty paths on historical difficulty
+- `--price`: Include BTC price projection plot
+- `--n-sims N`: Number of Monte Carlo simulations (default from config)
 - `--mc-seed SEED`: Optional RNG seed for Monte Carlo sampling
 - `--mc-show-paths N`: Overlay N individual Monte Carlo cumulative-sats paths on the ROI plot
 - `--mc-bands LIST`: Comma-separated percentile bands for ROI cloud (e.g., `10-90,25-75`)
@@ -180,34 +181,34 @@ python main.py [rig_config] [options]
 
 ### Examples
 
-Compare all rigs with difficulty and price projections:
+Single rig with default simulations:
 
 ```bash
-python main.py --diff --price
+python main.py rigs/s21_plus_225th.json
 ```
 
-Analyze a specific rig with all visualizations:
+Single rig with custom simulation count:
 
 ```bash
-python main.py rigs/s21_plus_225th.json --diff --price
+python main.py rigs/s21_plus_225th.json --n-sims 200 --mc-seed 42
 ```
 
-Run a Monte Carlo random-walk difficulty simulation for a single rig:
+Multi-rig comparison (uses shared difficulty paths):
 
 ```bash
-python main.py rigs/s21_plus_225th.json --monte-carlo 50 --mc-seed 42
+python main.py --n-sims 50
 ```
 
-Show sample paths and custom bands:
+Show sample ROI paths and custom bands:
 
 ```bash
-python main.py rigs/s21_plus_225th.json --monte-carlo 50 --mc-show-paths 5 --mc-bands "5-95,25-75"
+python main.py rigs/s21_plus_225th.json --mc-show-paths 5 --mc-bands "5-95,25-75"
 ```
 
-Show difficulty trajectories used in Monte Carlo:
+Show Monte Carlo difficulty trajectories on top of history:
 
 ```bash
-python main.py rigs/s21_plus_225th.json --monte-carlo 50 --mc-show-difficulty 5
+python main.py rigs/s21_plus_225th.json --mc-show-difficulty 5 --diff
 ```
 
 Use a custom rigs directory:
@@ -294,41 +295,29 @@ The simulator provides:
 1. **Console Output**:
    - Rig specifications (hashrate, efficiency, price)
    - Equipment cost in satoshis
-   - Final cumulative profits (sats and USD)
-   - ROI epoch indices (when break-even is reached)
+   - Final cumulative profits percentiles (sats and USD)
+   - ROI epoch percentiles (when break-even is reached)
 
 2. **Visualizations**:
    - **Single Rig Analysis**:
-     - Cumulative profit in satoshis (two difficulty scenarios)
-     - Cumulative profit in USD (two difficulty scenarios)
-     - Daily profit (sats and USD)
+     - Monte Carlo ROI cloud with percentile bands (cumulative sats)
+     - Sample cumulative-sats paths (optional)
+     - Monte Carlo difficulty path overlays on historical difficulty (optional)
      - BTC price projection (optional)
    
    - **Multi-Rig Comparison**:
-     - Cumulative sats comparison
-     - Cumulative USD comparison
-     - BTC price projection (optional)
-   
-   - **Difficulty Projections** (with `--diff`):
-     - Historical difficulty vs. projections (log and linear scales)
-     - Original slope vs. reduced slope scenarios
+     - Percentile bands and median lines per rig (shared difficulty scenarios)
+     - Monte Carlo difficulty overlays (optional)
+     - BTC price projection (optional, sample path)
 
 ## Understanding the Results
-
-### Difficulty Scenarios
-
-The simulator runs two scenarios:
-
-1. **Original Slope**: Uses the fitted difficulty growth rate directly
-2. **Reduced Slope**: Uses a reduced growth rate (default: 75% of original)
-
-The reduced slope scenario provides a more conservative estimate, accounting for potential slowdowns in difficulty growth.
 
 ### Monte Carlo (random-walk) Difficulty
 
 - Uses the fitted exponential slope as drift and adds a cumulative random walk in log-difficulty using bootstrapped residuals from the historical fit (starts at `log(D0)`).
-- Each simulation yields a full difficulty path that feeds the standard ROI simulator; BTC price modeling and halving logic are unchanged.
-- Outputs include percentile bands of cumulative sats over time and a histogram of ROI epochs (when cumulative sats crosses zero) across simulations.
+- Each simulation yields a full difficulty path that feeds the ROI simulator; BTC price modeling and halving logic are unchanged.
+- Outputs include percentile bands of cumulative sats over time and a distribution of ROI epochs (when cumulative sats crosses zero) across simulations.
+- In multi-rig mode, all rigs share the same difficulty paths to keep comparisons fair.
 
 ### Key Metrics
 

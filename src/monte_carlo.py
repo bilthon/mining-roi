@@ -105,14 +105,20 @@ def run_monte_carlo_for_rig(
     curtailment_enabled: bool = CURTAILMENT_ENABLED,
     curtailment_hours_per_week: float = CURTAILMENT_HOURS_PER_WEEK,
     curtailment_electricity_usd_per_kwh: Optional[float] = CURTAILMENT_ELECTRICITY_USD_PER_KWH,
+    difficulty_paths: Optional[np.ndarray] = None,
+    timeline: Optional[Dict[str, np.ndarray]] = None,
 ) -> Dict:
-    difficulty_paths, timeline = generate_difficulty_paths(
-        diff_info=diff_info,
-        years_horizon=years_horizon,
-        n_sims=n_sims,
-        slope_factor=slope_factor,
-        seed=seed,
-    )
+    if difficulty_paths is None or timeline is None:
+        difficulty_paths, timeline = generate_difficulty_paths(
+            diff_info=diff_info,
+            years_horizon=years_horizon,
+            n_sims=n_sims,
+            slope_factor=slope_factor,
+            seed=seed,
+        )
+    else:
+        # Ensure n_sims aligns with the provided difficulty paths
+        n_sims = difficulty_paths.shape[0]
 
     hashrate_ths = float(rig["hashrate_ths"])
     efficiency_j_per_th = float(rig["efficiency_j_per_th"])
@@ -129,7 +135,6 @@ def run_monte_carlo_for_rig(
     for idx, difficulty_path in enumerate(difficulty_paths):
         df_out, equip_sats, roi_sats, roi_usd = simulate_miner(
             difficulty_info=diff_info,
-            slope_factor=slope_factor,
             hashrate_ths=hashrate_ths,
             efficiency_j_per_th=efficiency_j_per_th,
             equipment_price_usd=equipment_price_usd,
@@ -214,3 +219,56 @@ def load_rig_and_run_monte_carlo(
         curtailment_hours_per_week=curtailment_hours_per_week,
         curtailment_electricity_usd_per_kwh=curtailment_electricity_usd_per_kwh,
     )
+
+
+def run_monte_carlo_multi_rig(
+    diff_info: Dict,
+    rig_entries: List[Dict],
+    years_horizon: int = YEARS_HORIZON,
+    n_sims: int = 100,
+    slope_factor: float = 1.0,
+    seed: Optional[int] = None,
+    btc_price_now_usd: float = BTC_PRICE_NOW_USD,
+    electricity_usd_per_kwh: float = ELECTRICITY_USD_PER_KWH,
+    curtailment_enabled: bool = CURTAILMENT_ENABLED,
+    curtailment_hours_per_week: float = CURTAILMENT_HOURS_PER_WEEK,
+    curtailment_electricity_usd_per_kwh: Optional[float] = CURTAILMENT_ELECTRICITY_USD_PER_KWH,
+) -> Dict[str, Dict]:
+    """
+    Run Monte Carlo simulations for multiple rigs using shared difficulty paths.
+    Returns a dictionary keyed by rig name, each containing the single-rig MC result.
+    """
+    if not rig_entries:
+        return {}
+
+    shared_paths, shared_timeline = generate_difficulty_paths(
+        diff_info=diff_info,
+        years_horizon=years_horizon,
+        n_sims=n_sims,
+        slope_factor=slope_factor,
+        seed=seed,
+    )
+
+    results: Dict[str, Dict] = {}
+    for entry in rig_entries:
+        rig_config = entry.get("config", entry)
+        rig_name = rig_config.get("name") or (entry["path"].stem if "path" in entry else "rig")
+
+        mc_result = run_monte_carlo_for_rig(
+            diff_info=diff_info,
+            rig=rig_config,
+            years_horizon=years_horizon,
+            n_sims=n_sims,
+            slope_factor=slope_factor,
+            seed=seed,
+            btc_price_now_usd=btc_price_now_usd,
+            electricity_usd_per_kwh=electricity_usd_per_kwh,
+            curtailment_enabled=curtailment_enabled,
+            curtailment_hours_per_week=curtailment_hours_per_week,
+            curtailment_electricity_usd_per_kwh=curtailment_electricity_usd_per_kwh,
+            difficulty_paths=shared_paths,
+            timeline=shared_timeline,
+        )
+        results[rig_name] = mc_result
+
+    return results

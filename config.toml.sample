@@ -10,7 +10,9 @@ fee_sats_per_block = 2000000
 [simulation]
 years_horizon = 4
 diff_min_height = 700000
-reduced_slope_factor = 0.75
+default_mc_simulations = 100
+mc_default_seed = 42
+mc_default_bands = "10-90,25-75"
 
 [curtailment]
 enabled = false
